@@ -28,7 +28,7 @@ import Data.List
 -- | Show a checkid mode.
 show_CheckIdMode :: CheckIdMode -> String
 show_CheckIdMode Setup     = "checkid_setup"
-show_CheckIdMode Immediate = "checkid_setup"
+show_CheckIdMode Immediate = "checkid_immediate"
 
 
 -- | Read a checkid mode
