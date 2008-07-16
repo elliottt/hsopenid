@@ -15,6 +15,7 @@ module Network.OpenID.Utils (
   , readMaybe
   , breaks
   , unroll
+  , parseParams
   ) where
 
 -- Libraries
@@ -49,3 +50,13 @@ unroll = reverse . unfoldr step
     step 0 = Nothing
     step i = Just (fromIntegral i, i `shiftR` 8)
 
+
+-- | Parse OpenID parameters out of a url string
+parseParams :: String -> [(String,String)]
+parseParams xs = case break (== '?') xs of
+  (_,_:bs) -> map f (breaks (== '&') bs)
+  _        -> []
+  where
+  f ys = case break (== '=') ys of
+    (as,_:bs) -> (as, unEscapeString bs)
+    (as,[])   -> (as, [])

@@ -125,13 +125,3 @@ generateMessage  = B.pack . map (toEnum . fromEnum) . concatMap f
 
 parseSignedFields :: String -> [String]
 parseSignedFields  = map ("openid." ++) . breaks (== ',')
-
-
-parseParams :: String -> [(String,String)]
-parseParams xs = case break (== '?') xs of
-  (_,_:bs) -> map f (breaks (== '&') bs)
-  _        -> []
-  where
-  f ys = case break (== '=') ys of
-    (as,_:bs) -> (as, unEscapeString bs)
-    (as,[])   -> (as, [])
