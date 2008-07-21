@@ -1,0 +1,20 @@
+name:               openid
+version:            0.1
+cabal-version:      >= 1.2
+synopsis:           An implementation of the OpenID-2.0 spec.
+description:        An implementation of the OpenID-2.0 spec.
+category:           Network
+author:             Trevor Elliott
+maintainer:         trevor@geekgateway.com
+copyright:          (c) 2008. Trevor Elliott <trevor@geekgateway.com>
+license:            BSD3
+license-file:       LICENSE
+build-type:         Simple
+tested-with:        GHC == 6.8.2
+
+
+library
+  build-depends:   base
+  exposed-modules: Network.OpenID
+  ghc-options:     -Wall
+  extra-libraries: crypto
