@@ -16,12 +16,15 @@ module Network.OpenID.Discovery (
   ) where
 
 -- Friends
+import Network.OpenID.Types
+import Text.XRDS
+
+-- Libraries
 import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
-import Network.OpenID.Types
-import Text.XRDS
+import Network.HTTP
 
 
 -- | Attempt to resolve an OpenID endpoint, and user identifier.
@@ -29,26 +32,34 @@ discover :: Monad m
          => Resolver m YADIS -> Resolver m HTML -> Identifier
          -> m (Maybe (Provider,Identifier))
 discover resolveYADIS resolveHTML ident = do
-  res <- discoverYADIS resolveYADIS ident
+  let rec = discover resolveYADIS resolveHTML
+  res <- discoverYADIS rec resolveYADIS ident
   case res of
     Just {} -> return res
-    _       -> discoverHTML resolveHTML ident
+    _       -> discoverHTML rec resolveHTML ident
 
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
 -- an OpenID endpoint, and the actual identifier for the user.
 discoverYADIS :: Monad m
-              => Resolver m YADIS -> Identifier -> m (Maybe (Provider,Identifier))
-discoverYADIS resolve ident = do
+              => (Identifier -> m (Maybe (Provider,Identifier)))
+              -> Resolver m YADIS -> Identifier
+              -> m (Maybe (Provider,Identifier))
+discoverYADIS rec resolve ident = do
   estr <- resolve (getIdentifier ident)
   case estr of
-    Left  {}      -> return Nothing
-    Right (_,str) ->
-      let res = parseYADIS ident =<< parseXRDS str
-       in case res of
-            Just (_,ident') | ident == ident' -> return res
-                            | otherwise       -> discoverYADIS resolve ident'
-            Nothing                           -> return Nothing
+    Left  {}         -> return Nothing
+    Right (hdrs,str) ->
+      let p (Header (HdrCustom "X-XRDS-Location") v) = Just v
+          p _                                        = Nothing
+       in case mapMaybe p hdrs of
+            loc:_ -> rec (Identifier loc)
+            _     ->
+              let res = parseYADIS ident =<< parseXRDS str
+               in case res of
+                    Just (_,ident') | ident == ident' -> return res
+                                    | otherwise       -> rec ident'
+                    Nothing                           -> return Nothing
 
 
 -- | Parse out an OpenID endpoint, and actual identifier from a YADIS xml
@@ -75,8 +86,10 @@ parseYADIS ident = join . listToMaybe . map isOpenId . concat
 -- | Attempt to discover an OpenID endpoint, from an HTML document.  The result
 -- will be an endpoint on success, and the actual identifier of the user.
 discoverHTML :: Monad m
-             => Resolver m HTML -> Identifier -> m (Maybe (Provider,Identifier))
-discoverHTML resolve ident = do
+             => (Identifier -> m (Maybe (Provider,Identifier)))
+             -> Resolver m HTML -> Identifier
+             -> m (Maybe (Provider,Identifier))
+discoverHTML _rec resolve ident = do
   estr <- resolve $ getIdentifier ident
   case estr of
     Left  {}      -> return Nothing

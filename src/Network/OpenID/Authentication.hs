@@ -11,9 +11,7 @@
 --
 
 module Network.OpenID.Authentication (
-    show_CheckIdMode
-  , read_CheckIdMode
-  , authenticationURL
+    authenticationURL
   ) where
 
 -- Friends
@@ -25,21 +23,8 @@ import Network.OpenID.Utils
 import Data.List
 
 
--- | Show a checkid mode.
-show_CheckIdMode :: CheckIdMode -> String
-show_CheckIdMode Setup     = "checkid_setup"
-show_CheckIdMode Immediate = "checkid_immediate"
-
-
--- | Read a checkid mode
-read_CheckIdMode :: String -> Maybe CheckIdMode
-read_CheckIdMode "checkid_setup"     = Just Setup
-read_CheckIdMode "checkid_immediate" = Just Immediate
-read_CheckIdMode _                   = Nothing
-
-
 -- | Request authentication
-authenticationURL :: Maybe Association -> CheckIdMode
+authenticationURL :: Maybe Association -> AuthRequestMode
                   -> String -> Provider -> Identifier
                   -> String
 authenticationURL mbassoc mode ret prov ident =
@@ -47,7 +32,7 @@ authenticationURL mbassoc mode ret prov ident =
       idt   = getIdentifier ident
       params = concat
              $ intersperse "&"
-             $ ("openid.mode=" ++ show_CheckIdMode mode)
+             $ ("openid.mode=" ++ show_AuthRequestMode mode)
              : ("openid.identity=" ++ escapeParam idt)
              : ("openid.claimed_id=" ++ escapeParam idt)
              : ("openid.ns=" ++ escapeParam "http://specs.openid.net/auth/2.0")

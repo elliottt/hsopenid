@@ -12,14 +12,19 @@
 
 module Network.OpenID.Utils (
     escapeParam
+  , parseParams
+  , formatParams
+  , formatDirectParams
   , readMaybe
   , breaks
+  , roll
   , unroll
-  , parseParams
+  , btwoc
   ) where
 
 -- Libraries
 import Data.Bits
+import Data.Char
 import Data.List
 import Data.Word
 import Network.URI
@@ -28,6 +33,29 @@ import Network.URI
 -- | Escape for the query string of a URI
 escapeParam :: String -> String
 escapeParam  = escapeURIString isUnreserved
+
+
+-- | Parse OpenID parameters out of a url string
+parseParams :: String -> [(String,String)]
+parseParams xs = case break (== '?') xs of
+  (_,_:bs) -> map f (breaks (== '&') bs)
+  _        -> []
+  where
+  f ys = case break (== '=') ys of
+    (as,_:bs) -> (as, unEscapeString bs)
+    (as,[])   -> (as, [])
+
+
+-- | Format OpenID parameters as a query string
+formatParams :: [(String,String)] -> String
+formatParams  = concat . intersperse "&" . map f
+  where f (x,y) = x ++ "=" ++ escapeParam y
+
+
+-- | Format parameters for a direct request
+formatDirectParams :: [(String,String)] -> String
+formatDirectParams  = concatMap f
+  where f (x,y) = x ++ ":" ++ y ++ "\n"
 
 
 -- | Read, maybe.
@@ -44,6 +72,11 @@ breaks p xs = case break p xs of
   (as,_)    -> [as]
 
 
+roll :: [Word8] -> Integer
+roll  = foldr step 0 . reverse
+  where step n acc = acc `shiftL` 8 .|. fromIntegral n
+
+
 unroll :: Integer -> [Word8]
 unroll = reverse . unfoldr step
   where
@@ -51,12 +84,7 @@ unroll = reverse . unfoldr step
     step i = Just (fromIntegral i, i `shiftR` 8)
 
 
--- | Parse OpenID parameters out of a url string
-parseParams :: String -> [(String,String)]
-parseParams xs = case break (== '?') xs of
-  (_,_:bs) -> map f (breaks (== '&') bs)
-  _        -> []
-  where
-  f ys = case break (== '=') ys of
-    (as,_:bs) -> (as, unEscapeString bs)
-    (as,[])   -> (as, [])
+btwoc :: [Word8] -> [Word8]
+btwoc [] = [0x0]
+btwoc bs@(x:_) | testBit x 7 = 0x0 : bs
+               | otherwise   =       bs
