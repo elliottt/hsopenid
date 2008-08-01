@@ -4,6 +4,8 @@ module DiffieHellman (
     -- * Diffie-Hellman key exchange
     DHParams(..)
   , DHParamError(..)
+  , Modulus
+  , Generator
   , newDHParams
   , checkDHParams
   , computeKey

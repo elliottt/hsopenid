@@ -24,6 +24,7 @@ module Network.OpenID.Association (
 
 -- Friends
 import Codec.Binary.Base64
+import DiffieHellman
 import Network.OpenID.Types
 import Network.OpenID.Utils
 
@@ -49,7 +50,7 @@ getHashFunction HmacSha256 = sha256
 
 -- | Serialize an association into a form that's suitable for passing as a set
 -- of request parameters.
-assocToParams :: Association -> [String]
+assocToParams :: SessionType st => Association st -> [String]
 assocToParams assoc = ["openid.assoc_handle=" ++ handle]
   where handle = escapeURIString isUnreserved (assocHandle assoc)
 
@@ -64,20 +65,22 @@ defaultGen :: Integer
 defaultGen  = 2
 
 
-trc x = trace (show x) x
-
-
 -- | Attempt to associate to a provider.
-associate :: Monad m
-          => Request m -> AssocType -> Maybe SessionType -> Provider
-          -> m (Result Association)
-associate resolve at mb_st ep = do
-  let body = formatParams
+associate :: (Monad m, SessionType st)
+          => Request m -> AssocType -> Maybe Modulus -> Maybe Generator
+          -> SessionKeyType st -> Provider -> m (Result (Association st))
+associate resolve at mb_mod mb_gen skt ep = do
+  let l k mb = maybeToList (f `fmap` mb)
+        where f x = (k, encodeRaw True $ unroll $ toInteger x)
+      body = formatParams
            $ ("openid.mode", "associate")
-           : ("openid.assoc_type", show_AssocType at)
            : ("openid.ns", "http://specs.openid.net/auth/2.0")
-           : maybe [] sessionTypeToParams mb_st
+           : ("openid.assoc_type", show_AssocType at)
+           : sessionTypeToParams skt
+           ++ l "openid.dh_modulus" mb_mod
+           ++ l "openid.dh_gen" mb_gen
       req  = getProvider ep
+      (_,key) = getParams (getKey skt)
   eresp <- resolve req $ trc body
   case eresp of
     Left  err     -> return $ fail err
@@ -85,23 +88,24 @@ associate resolve at mb_st ep = do
       let split xs = case break (== ':') xs of
             (as,[])   -> (as,[])
             (as,_:bs) -> (as,bs)
-          resp = map split $ lines $ trc str
+          resp = trc $ map split $ lines str
        in case lookup "error" resp of
-          Just e  -> fail e
-          Nothing -> return (associationFromParams [] resp)
+          Just e  -> return $ fail e
+          Nothing -> return (associationFromParams (Just key) (fromJust mb_mod) (fromJust mb_gen) resp)
 
 
 -- Verification ----------------------------------------------------------------
 
 -- | Given an association and a signed message, verify the signature and use
 -- a supplied function to build a type.
-verifySignature :: Association -> Signed a -> (Params -> Maybe a)
+verifySignature :: SessionType st
+                => Association st -> Signed a -> (Params -> Maybe a)
                 -> Either String a
 verifySignature assoc sig f =
   let fields    = sigFields sig
       params    = sigParams sig
       signature = sigValue  sig
-      key       = B.pack $ decode $ assocMacKey assoc
+      key       = B.pack $ assocMacKey assoc
       message   = generateMessage fields params
       hash      = getHashFunction (assocType assoc)
       err       = Left "Unable to parse params"
