@@ -15,10 +15,13 @@ module Network.OpenID.Types where
 
 -- Friends
 import Codec.Binary.Base64
+import Codec.Binary.SHA
+import DiffieHellman
 import Network.OpenID.Utils
 
 -- Libraries
 import Control.Monad
+import Data.Bits
 import Data.Word
 import Network.HTTP hiding (Result)
 
@@ -40,11 +43,26 @@ newtype Identifier = Identifier { getIdentifier :: String } deriving (Eq,Show)
 
 data Result a = Error String | Result a deriving Show
 
+-- | Turn a maybe into a result, using the provided error message in the case of
+-- a Nothing
+maybeToResult :: String -> Maybe a -> Result a
+maybeToResult _   (Just a) = Result a
+maybeToResult err Nothing  = Error err
+
+instance Functor Result where
+  fmap f (Result r) = Result (f r)
+  fmap _ (Error  e) = Error e
+
 instance Monad Result where
   return         = Result
   Error  e >>= _ = Error e
   Result a >>= f = f a
   fail           = Error
+
+instance MonadPlus Result where
+  mzero = Error "mzero"
+  mplus a@(Result _) _ = a
+  mplus   (Error  _) b = b
 
 -- Request Parameters ----------------------------------------------------------
 
@@ -69,56 +87,124 @@ show_AssocType HmacSha1   = "HMAC-SHA1"
 show_AssocType HmacSha256 = "HMAC-SHA256"
 
 
-data SessionType
-  = DhSha1   { stModulus :: Integer, stGenerator :: Int, stPublicKey :: [Word8] }
-  | DhSha256 { stModulus :: Integer, stGenerator :: Int, stPublicKey :: [Word8] }
+data SessionKeyType st
+  = ServerKey   { getKey :: st }
+  | ConsumerKey { getKey :: st }
   deriving Show
 
 
--- | Read a session type from a set of parameters.  The Nothing case indicates
--- that no encryption was requested.
-params_to_SessionType :: [Word8] -> Params -> Maybe SessionType
-params_to_SessionType pkey ps = do
-  let l k = lookup k ps
-  ty <- l "openid.session_type"
-  guard (ty /= "no-encryption")
-  let dec = roll . decode
-  m   <- dec `fmap` l "openid.dh_modulus"
-  gen <- dec `fmap` l "openid.dh_gen"
-  f <- case ty of
-    "DH-SHA1"   -> return DhSha1
-    "DH-SHA256" -> return DhSha256
-    _           -> Nothing
-  return $ f m (fromInteger gen) pkey
+class SessionType st where
+  fromParams :: Params -> Maybe (SessionKeyType st)
+  getParams  :: st -> (String,[Word8])
 
 
--- | Show a session type.
-sessionType_to_params :: SessionType -> Params
-sessionType_to_params st = case st of
-  DhSha1   m g pk -> f m g pk "DH-SHA1"
-  DhSha256 m g pk -> f m g pk "DH-SHA256"
+-- | Turn a session type into a list of parameters
+toParams :: SessionType st => SessionKeyType st -> Params
+toParams skt = case skt of
+  ServerKey   st -> params "openid.dh_server_key"   st
+  ConsumerKey st -> params "openid.dh_consumer_key" st
   where
-  enc = encodeRaw True . btwoc
-  f m g pk t = [ ("openid.session_type", t)
-               , ("openid.dh_modulus", enc $ unroll m)
-               , ("openid.dh_gen", enc $ unroll $ toEnum g)
-               , ("openid.dh_consumer_public", enc pk)
-               ]
+  params kty st =
+    [ ("openid.session_type", ty)
+    , (kty, encodeRaw True (btwoc key))
+    ]
+    where (ty,key) = getParams st
 
 
-data Association = Association
-  { assocHandle  :: String
-  , assocType    :: AssocType
-  , assocExpires :: Int
-  , assocMacKey  :: String
+newtype DhSha1 = DhSha1 { dhSha1Key :: [Word8] } deriving Show
+
+instance SessionType DhSha1 where
+  fromParams ps = do
+    let l k = lookup k ps
+    ty <- l "openid.session_type"
+    guard (ty == "DH-SHA1")
+    (f,key) <- case l "openid.dh_consumer_public" of
+      Just key -> return (ConsumerKey,key)
+      Nothing -> do
+        key <- l "openid.dh_server_public"
+        return (ServerKey,key)
+    return $ f $ DhSha1 $ decode key
+  getParams (DhSha1 key) = ("DH-SHA1", key)
+
+
+newtype DhSha256 = DhSha256 { dhSha256Key :: [Word8] } deriving Show
+
+instance SessionType DhSha256 where
+  fromParams ps = do
+    let l k = lookup k ps
+    ty <- l "openid.session_type"
+    guard (ty == "DH-SHA256")
+    (f,key) <- case l "openid.dh_consumer_public" of
+      Just key -> return (ConsumerKey,key)
+      Nothing -> do
+        key <- l "openid.dh_server_public"
+        return (ServerKey,key)
+    return $ f $ DhSha256 $ decode key
+  getParams (DhSha256 key) = ("DH-SHA256", key)
+
+
+data NoEncryption = NoEncryption deriving Show
+
+instance SessionType NoEncryption where
+  fromParams ps = do
+    ty <- lookup "openid.session_type" ps
+    guard (ty == "no-encryption")
+    case lookup "openid.mode" ps of
+      Just {} -> return $ ConsumerKey NoEncryption
+      Nothing -> return $ ServerKey   NoEncryption
+  getParams NoEncryption = ("no-encryption", [])
+
+
+data Association st = Association
+  { assocHandle       :: String
+  , assocType         :: AssocType
+  , assocExpires      :: Int
+  , assocMacKey       :: [Word8]
+  , assocModulus      :: Maybe Integer
+  , assocGenerator    :: Maybe Int
+  , assocSessionType  :: SessionKeyType st
   } deriving Show
 
 
-data AssocRequest = AssocRequest
-  { arNS               :: String
-  , arType             :: AssocType
-  , arSessionType      :: SessionType
-  } deriving Show
+associationFromParams :: SessionType st
+                      => Maybe [Word8] -> Params -> Result (Association st)
+associationFromParams pubKey ps = do
+  let l k = maybeToResult ("field not present: " ++ k) $ lookup k ps
+      r k = maybeToResult ("unable to read: " ++ k) . readMaybe =<< l k
+  ah  <- l "openid.assoc_handle"
+  at  <- maybeToResult "unable to read: openid.assoc_type" . read_AssocType
+         =<< l "openid.assoc_type"
+  exp <- r "openid.expires_in"
+  st  <- maybeToResult "unable to read session type" $ fromParams ps
+  let dh h pk label = do
+        mk <- decode `fmap` l label
+        p <- r "openid.dh_modulus"
+        g <- r "openid.dh_gen"
+        k <- maybeToResult "no public key provided" pubKey
+        let privKey = computeKey pk $ DHParams
+                        { dhModulus    = p
+                        , dhGenerator  = g
+                        , dhPublicKey  = k
+                        , dhPrivateKey = []
+                        }
+            hash = h privKey
+            key = zipWith xor hash mk
+        guard (length hash == length mk)
+        return (key, Just p, Just g)
+  (mk,mb_mod,mb_gen) <- case getParams (getKey st) of
+    ("no-encryption", _) -> do mk <- l "openid.mac_key"
+                               return (decode mk,Nothing,Nothing)
+    ("DH-SHA1", k)       -> dh sha1   k "openid.enc_mac_key"
+    ("DH-SHA256", k)     -> dh sha256 k "openid.enc_mac_key"
+    (ty,_)               -> Error ("unsupported session type: " ++ ty)
+  return Association { assocHandle      = ah
+                     , assocType        = at
+                     , assocExpires     = exp
+                     , assocMacKey      = mk
+                     , assocModulus     = mb_mod
+                     , assocGenerator   = mb_gen
+                     , assocSessionType = st
+                     }
 
 
 -- Signed Requests -------------------------------------------------------------

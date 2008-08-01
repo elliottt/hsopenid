@@ -1,6 +1,3 @@
-{-# INCLUDE "openssl/bn.h"                            #-}
-{-# INCLUDE "openssl/dh.h"                            #-}
-{-# INCLUDE "openssl/engine.h"                        #-}
 {-# LANGUAGE ForeignFunctionInterface, EmptyDataDecls #-}
 
 module DiffieHellman (
@@ -108,8 +105,9 @@ checkDHParams ps =
        _ -> return []
 
 
-computeKey :: [Word8] -> DHParams -> IO [Word8]
-computeKey pubKey ps =
+{-# NOINLINE computeKey #-}
+computeKey :: [Word8] -> DHParams -> [Word8]
+computeKey pubKey ps = unsafePerformIO $
   withDH ps []                  $ \dh   ->
   c_DH_size dh                >>= \size ->
   allocaArray (fromEnum size)   $ \key  ->

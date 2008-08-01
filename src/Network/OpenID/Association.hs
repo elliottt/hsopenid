@@ -69,33 +69,26 @@ trc x = trace (show x) x
 
 -- | Attempt to associate to a provider.
 associate :: Monad m
-          => Request m -> AssocRequest -> Provider
+          => Request m -> AssocType -> Maybe SessionType -> Provider
           -> m (Result Association)
-associate resolve ar ep = do
+associate resolve at mb_st ep = do
   let body = formatParams
            $ ("openid.mode", "associate")
-           : ("openid.assoc_type", show_AssocType $ arType ar)
+           : ("openid.assoc_type", show_AssocType at)
            : ("openid.ns", "http://specs.openid.net/auth/2.0")
-           : sessionType_to_params (arSessionType ar)
+           : maybe [] sessionTypeToParams mb_st
       req  = getProvider ep
   eresp <- resolve req $ trc body
   case eresp of
     Left  err     -> return $ fail err
     Right (_,str) ->
       let split xs = case break (== ':') xs of
-            (as,_:bs) -> (as,bs)
             (as,[])   -> (as,[])
+            (as,_:bs) -> (as,bs)
           resp = map split $ lines $ trc str
        in case lookup "error" resp of
           Just e  -> fail e
-          Nothing -> return $ do
-            let f m = maybe (fail m) return
-                l k = lookup k resp
-            h <- f "assoc_handle" $                    l "assoc_handle"
-            t <- f "assoc_type"   $ read_AssocType =<< l "assoc_type"
-            e <- f "expires_in"   $ readMaybe      =<< l "expires_in"
-            m <- f "mac_key"      $                    l "mac_key"
-            return $ Association h t e m
+          Nothing -> return (associationFromParams [] resp)
 
 
 -- Verification ----------------------------------------------------------------
