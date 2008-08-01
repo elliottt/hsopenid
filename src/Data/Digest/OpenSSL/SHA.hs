@@ -1,8 +1,9 @@
+{-# INCLUDE <openssl/evp.h> #-}
 {-# LANGUAGE ForeignFunctionInterface, EmptyDataDecls #-}
 
 --------------------------------------------------------------------------------
 -- |
--- Module      : Codec.Binary.SHA
+-- Module      : Data.Digest.OpenSSL.SHA
 -- Copyright   : (c) Trevor Elliott, 2008
 -- License     : BSD3
 --
@@ -11,27 +12,30 @@
 -- Portability :
 --
 
-module Codec.Binary.SHA (sha1, sha256) where
+module Data.Digest.OpenSSL.SHA (sha1, sha256) where
 
 import Control.Exception
 import Foreign
 import Foreign.C
 
-#include <openssl/evp.h>
-
 data EVP_MD
 data EVP_MD_CTX
 
--- | Sha1 encoding
+-- | Sha1 hashing
 {-# NOINLINE sha1 #-}
-sha1 = sha c_EVP_sha1
+sha1 :: [Word8] -> [Word8]
+sha1 = unsafePerformIO . hashWith c_EVP_sha1
 
+
+-- | Sha256 hashing
 {-# NOINLINE sha256 #-}
-sha256 = sha c_EVP_sha256
+sha256 :: [Word8] -> [Word8]
+sha256 = unsafePerformIO . hashWith c_EVP_sha256
 
 
-sha :: IO (Ptr EVP_MD) -> [Word8] -> [Word8]
-sha hf bs = unsafePerformIO $
+-- | General purpose digest function wrapper for OpenSSL.
+hashWith :: IO (Ptr EVP_MD) -> [Word8] -> IO [Word8]
+hashWith hf bs =
   bracket c_EVP_MD_CTX_create c_EVP_MD_CTX_destroy $ \ evp_md_ctx ->
   withArrayLen (map (toEnum . fromEnum) bs) $ \ len arr -> do
     h <- hf

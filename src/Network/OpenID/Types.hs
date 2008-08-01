@@ -15,7 +15,7 @@ module Network.OpenID.Types where
 
 -- Friends
 import Codec.Binary.Base64
-import Codec.Binary.SHA
+import Data.Digest.OpenSSL.SHA
 import DiffieHellman
 import Network.OpenID.Utils
 
