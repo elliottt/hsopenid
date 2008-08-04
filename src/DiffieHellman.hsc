@@ -8,6 +8,7 @@ module DiffieHellman (
   , Generator
   , newDHParams
   , checkDHParams
+  , generateKey
   , computeKey
   ) where
 
@@ -42,11 +43,11 @@ data DHParamError
 -- Utilities -------------------------------------------------------------------
 
 roll :: [Word8] -> Integer
-roll  = foldr step 0
+roll  = foldr step 0 . reverse
   where step n acc = acc `shiftL` 8 .|. fromIntegral n
 
 unroll :: Integer -> [Word8]
-unroll  = unfoldr step
+unroll  = reverse . unfoldr step
   where
     step 0 = Nothing
     step n = Just (fromIntegral n, n `shiftR` 8)
@@ -64,6 +65,18 @@ withDH ps a f = c_DH_new >>= \ptr -> if ptr == nullPtr
           return res
 
 
+dhToDHParams :: Ptr DHParams -> IO DHParams
+dhToDHParams ptr = do
+  privKey <- bn2bin =<< (#peek DH, priv_key) ptr
+  pubKey  <- bn2bin =<< (#peek DH, pub_key)  ptr
+  p       <- bn2bin =<< (#peek DH, p)        ptr
+  g       <- bn2bin =<< (#peek DH, g)        ptr
+  return $ DHParams { dhPrivateKey = privKey
+                    , dhPublicKey  = pubKey
+                    , dhGenerator  = fromInteger $ roll g
+                    , dhModulus    = roll p
+                    }
+
 -- Diffie-Hellman --------------------------------------------------------------
 
 newDHParams :: Int -> Generator -> IO (Maybe DHParams)
@@ -72,17 +85,23 @@ newDHParams len gen = do
   if ptr == nullPtr
     then return Nothing
     else c_DH_generate_key ptr >>= \res -> case res of
-      1 -> do privKey <- bn2bin =<< (#peek DH, priv_key) ptr
-              pubKey  <- bn2bin =<< (#peek DH, pub_key)  ptr
-              p       <- bn2bin =<< (#peek DH, p)        ptr
+      1 -> do ps <- dhToDHParams ptr
               c_DH_free ptr
-              return $ Just
-                     $ DHParams { dhPrivateKey = privKey
-                                , dhPublicKey  = pubKey
-                                , dhGenerator  = gen
-                                , dhModulus    = fromInteger $ roll p
-                                }
+              return (Just ps)
       _ -> return Nothing
+
+
+generateKey :: Modulus -> Generator -> IO (Maybe DHParams)
+generateKey p g = c_DH_new >>= \ptr -> if ptr == nullPtr
+  then return Nothing
+  else do bin2bn (unroll p)             >>= (#poke DH, p) ptr
+          bin2bn (unroll (toInteger g)) >>= (#poke DH, g) ptr
+          res <- c_DH_generate_key ptr
+          case res of
+            1 -> do ps <- dhToDHParams ptr
+                    c_DH_free ptr
+                    return (Just ps)
+            _ -> return Nothing
 
 
 codesToErrors :: Int -> [DHParamError]

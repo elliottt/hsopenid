@@ -24,42 +24,42 @@ import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
-import Network.HTTP
+import Network.HTTP hiding (Result)
+import Network.URI
 
 
 -- | Attempt to resolve an OpenID endpoint, and user identifier.
-discover :: Monad m
-         => Resolver m YADIS -> Resolver m HTML -> Identifier
-         -> m (Maybe (Provider,Identifier))
-discover resolveYADIS resolveHTML ident = do
-  let rec = discover resolveYADIS resolveHTML
-  res <- discoverYADIS rec resolveYADIS ident
+discover :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
+discover resolve ident = do
+  res <- discoverYADIS resolve ident
   case res of
-    Just {} -> return res
-    _       -> discoverHTML rec resolveHTML ident
+    Result {} -> return res
+    _         -> discoverHTML resolve ident
 
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
--- an OpenID endpoint, and the actual identifier for the user.
-discoverYADIS :: Monad m
-              => (Identifier -> m (Maybe (Provider,Identifier)))
-              -> Resolver m YADIS -> Identifier
-              -> m (Maybe (Provider,Identifier))
-discoverYADIS rec resolve ident = do
-  estr <- resolve (getIdentifier ident)
-  case estr of
-    Left  {}         -> return Nothing
-    Right (hdrs,str) ->
-      let p (Header (HdrCustom "X-XRDS-Location") v) = Just v
-          p _                                        = Nothing
-       in case mapMaybe p hdrs of
-            loc:_ -> rec (Identifier loc)
-            _     ->
-              let res = parseYADIS ident =<< parseXRDS str
-               in case res of
-                    Just (_,ident') | ident == ident' -> return res
-                                    | otherwise       -> rec ident'
-                    Nothing                           -> return Nothing
+--   an OpenID endpoint, and the actual identifier for the user.
+discoverYADIS :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
+discoverYADIS resolve ident =
+  let err = return . Error in
+  case parseURI (getIdentifier ident) of
+    Nothing  -> err "Unable to parse identifier as a URI"
+    Just uri -> do
+      estr <- resolve Request
+        { rqMethod  = GET
+        , rqURI     = uri
+        , rqHeaders = []
+        , rqBody    = ""
+        }
+      case estr of
+        Left  {}  -> err "HTTP request error"
+        Right rsp -> case rspCode rsp of
+          (2,0,0) -> case findHeader (HdrCustom "X-XRDS-Location") rsp of
+            Just loc -> discoverYADIS resolve (Identifier loc)
+            _        -> return $
+              maybeToResult "YADIS document doesn't include an OpenID provider"
+              (parseYADIS ident =<< parseXRDS (rspBody rsp))
+          _       -> err "HTTP request error"
 
 
 -- | Parse out an OpenID endpoint, and actual identifier from a YADIS xml
@@ -79,21 +79,30 @@ parseYADIS ident = join . listToMaybe . map isOpenId . concat
       , ("http://openid.net/signon/1.0"           , localId)
       , ("http://openid.net/signon/1.1"           , localId)
       ]
-    uri <- listToMaybe $ serviceURIs svc
-    return (Provider uri,lid)
+    uri <- parseProvider =<< listToMaybe (serviceURIs svc)
+    return (uri,lid)
 
 
 -- | Attempt to discover an OpenID endpoint, from an HTML document.  The result
 -- will be an endpoint on success, and the actual identifier of the user.
-discoverHTML :: Monad m
-             => (Identifier -> m (Maybe (Provider,Identifier)))
-             -> Resolver m HTML -> Identifier
-             -> m (Maybe (Provider,Identifier))
-discoverHTML _rec resolve ident = do
-  estr <- resolve $ getIdentifier ident
-  case estr of
-    Left  {}      -> return Nothing
-    Right (_,str) -> return (parseHTML ident str)
+discoverHTML :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
+discoverHTML resolve ident =
+  let err = return . Error in
+  case parseURI (getIdentifier ident) of
+    Nothing  -> err "Unable to parse identifier as a URI"
+    Just uri -> do
+      estr <- resolve Request
+        { rqMethod  = GET
+        , rqURI     = uri
+        , rqHeaders = []
+        , rqBody    = ""
+        }
+      case estr of
+        Left  {}  -> err "HTTP request error"
+        Right rsp -> case rspCode rsp of
+          (2,0,0) -> return $ maybeToResult "Unable to find identifier in HTML"
+                            $ parseHTML ident $ rspBody rsp
+          _       -> err "HTTP request error"
 
 
 -- | Parse out an OpenID endpoint and an actual identifier from an HTML
@@ -106,9 +115,9 @@ parseHTML ident = resolve
   where
     isOpenId (rel,_) = "openid" `isPrefixOf` rel
     resolve ls = do
-      prov <- lookup "openid2.provider" ls
+      prov <- parseProvider =<< lookup "openid2.provider" ls
       let lid = maybe ident Identifier $ lookup "openid2.local_id" ls
-      return (Provider prov,lid)
+      return (prov,lid)
 
 
 -- | Filter out link tags from a list of html tags.
@@ -145,5 +154,3 @@ splitAttr xs = case break (== '=') xs of
   f key p cs = case break p cs of
       (_,[])         -> Nothing
       (value,_:rest) -> Just ((key,value), dropWhile isSpace rest)
-
-

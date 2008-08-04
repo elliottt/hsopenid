@@ -11,7 +11,7 @@
 --
 
 module Network.OpenID (
-    module Network.OpenID.Association
+    module Network.OpenID.AssociationManager
   , module Network.OpenID.Authentication
   , module Network.OpenID.Discovery
   , module Network.OpenID.Normalization
@@ -20,7 +20,7 @@ module Network.OpenID (
   ) where
 
 -- Friends
-import Network.OpenID.Association
+import Network.OpenID.AssociationManager
 import Network.OpenID.Authentication
 import Network.OpenID.Discovery
 import Network.OpenID.Normalization
