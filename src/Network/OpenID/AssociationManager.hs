@@ -24,8 +24,8 @@ module Network.OpenID.AssociationManager (
 
 -- Friends
 import Codec.Binary.Base64
+import Codec.Encryption.DH
 import Data.Digest.OpenSSL.SHA
-import DiffieHellman
 import Network.OpenID.Response
 import Network.OpenID.Types
 import Network.OpenID.Utils
@@ -168,11 +168,10 @@ associate' am resolve prov at st
              : ("openid.assoc_type", show at)
              : ("openid.session_type", show st)
              : maybe [] dhPairs mb_dh
-        cl = show (length body)
     ersp <- resolve Request
       { rqMethod  = POST
       , rqURI     = providerURI prov
-      , rqHeaders = [ Header HdrContentLength cl ]
+      , rqHeaders = [ Header HdrContentLength $ show $ length body ]
       , rqBody    = body
       }
     withResponse ersp $ \rsp -> case rspCode rsp of

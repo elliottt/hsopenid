@@ -1,6 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface, EmptyDataDecls #-}
 
-module DiffieHellman (
+module Codec.Encryption.DH (
     -- * Diffie-Hellman key exchange
     DHParams(..)
   , DHParamError(..)
