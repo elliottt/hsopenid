@@ -205,8 +205,7 @@ handleAssociation :: AssociationManager am
                   -> AssocType -> SessionType
                   -> Result am
 handleAssociation am ps mb_dh prov now at st = do
-  let l k = maybeToResult ("Field not present in response: " ++ k)
-            (lookup k ps)
+  let l k = maybeToResult ("field not present: " ++ k) (lookup k ps)
   ah <- l "assoc_handle"
   ei <- readResult =<< l "expires_in"
   mk <- case (st,mb_dh) of

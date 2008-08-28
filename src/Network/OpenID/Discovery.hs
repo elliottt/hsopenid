@@ -52,14 +52,14 @@ discoverYADIS resolve ident =
         , rqBody    = ""
         }
       case estr of
-        Left  {}  -> err "HTTP request error"
+        Left  e   -> err $ "HTTP request error: " ++ show e
         Right rsp -> case rspCode rsp of
           (2,0,0) -> case findHeader (HdrCustom "X-XRDS-Location") rsp of
             Just loc -> discoverYADIS resolve (Identifier loc)
             _        -> return $
               maybeToResult "YADIS document doesn't include an OpenID provider"
               (parseYADIS ident =<< parseXRDS (rspBody rsp))
-          _       -> err "HTTP request error"
+          _       -> err "HTTP request error: unexpected response code"
 
 
 -- | Parse out an OpenID endpoint, and actual identifier from a YADIS xml
@@ -98,11 +98,11 @@ discoverHTML resolve ident =
         , rqBody    = ""
         }
       case estr of
-        Left  {}  -> err "HTTP request error"
+        Left  e   -> err $ "HTTP request error: " ++ show e
         Right rsp -> case rspCode rsp of
           (2,0,0) -> return $ maybeToResult "Unable to find identifier in HTML"
                             $ parseHTML ident $ rspBody rsp
-          _       -> err "HTTP request error"
+          _       -> err "HTTP request error: unexpected response code"
 
 
 -- | Parse out an OpenID endpoint and an actual identifier from an HTML
