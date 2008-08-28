@@ -12,8 +12,11 @@ import Data.Maybe
 parseDirectResponse :: String -> Params
 parseDirectResponse  = unfoldr step
   where
+    step []  = Nothing
     step str = case break (== '\n') str of
-      (_,[])      -> Nothing
-      (ps,_:rest) -> case break (== ':') ps of
-        (_,[]) -> Nothing
-        (k,_:v) -> Just ((k,v),rest)
+      (ps,[])     -> Just (f ps,[])
+      (ps,_:rest) -> Just (f ps,rest)
+      where
+        f ps = case break (== ':') ps of
+          (k,[])  -> (k,[])
+          (k,_:v) -> (k,v)

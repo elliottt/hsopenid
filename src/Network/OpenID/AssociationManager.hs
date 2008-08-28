@@ -174,7 +174,9 @@ associate' am recover resolve prov at st
     ersp <- resolve Request
       { rqMethod  = POST
       , rqURI     = providerURI prov
-      , rqHeaders = [ Header HdrContentLength $ show $ length body ]
+      , rqHeaders = [ Header HdrContentLength $ show $ length body
+                    , Header HdrContentType "application/x-www-form-urlencoded"
+                    ]
       , rqBody    = body
       }
     withResponse ersp $ \rsp -> case rspCode rsp of

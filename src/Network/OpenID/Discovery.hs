@@ -31,7 +31,7 @@ import Network.URI
 -- | Attempt to resolve an OpenID endpoint, and user identifier.
 discover :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
 discover resolve ident = do
-  res <- discoverYADIS resolve ident
+  res <- discoverYADIS resolve ident Nothing
   case res of
     Result {} -> return res
     _         -> discoverHTML resolve ident
@@ -39,10 +39,12 @@ discover resolve ident = do
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
 --   an OpenID endpoint, and the actual identifier for the user.
-discoverYADIS :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
-discoverYADIS resolve ident =
-  let err = return . Error in
-  case parseURI (getIdentifier ident) of
+discoverYADIS :: Resolver -> Identifier -> Maybe String
+              -> IO (Result (Provider,Identifier))
+discoverYADIS resolve ident mb_loc = do
+  let err = return . Error
+      uri = fromMaybe (getIdentifier ident) mb_loc
+  case parseURI uri of
     Nothing  -> err "Unable to parse identifier as a URI"
     Just uri -> do
       estr <- resolve Request
@@ -55,7 +57,7 @@ discoverYADIS resolve ident =
         Left  e   -> err $ "HTTP request error: " ++ show e
         Right rsp -> case rspCode rsp of
           (2,0,0) -> case findHeader (HdrCustom "X-XRDS-Location") rsp of
-            Just loc -> discoverYADIS resolve (Identifier loc)
+            Just loc -> discoverYADIS resolve ident (Just loc)
             _        -> return $
               maybeToResult "YADIS document doesn't include an OpenID provider"
               (parseYADIS ident =<< parseXRDS (rspBody rsp))
@@ -69,11 +71,11 @@ parseYADIS ident = join . listToMaybe . map isOpenId . concat
   where
   isOpenId svc = do
     let tys = serviceTypes svc
-        localId = Identifier `fmap` listToMaybe (serviceLocalIDs svc)
-        f (x,y) | x `elem` tys = y
+        localId = maybe ident Identifier $ listToMaybe $ serviceLocalIDs svc
+        f (x,y) | x `elem` tys = Just y
                 | otherwise    = mzero
     lid <- listToMaybe $ mapMaybe f
-      [ ("http://specs.openid.net/auth/2.0/server", return ident)
+      [ ("http://specs.openid.net/auth/2.0/server", ident)
       -- claimed identifiers
       , ("http://specs.openid.net/auth/2.0/signon", localId)
       , ("http://openid.net/signon/1.0"           , localId)
