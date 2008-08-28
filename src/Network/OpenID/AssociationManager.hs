@@ -179,17 +179,16 @@ associate' am recover resolve prov at st
                     ]
       , rqBody    = body
       }
-    withResponse ersp $ \rsp -> case rspCode rsp of
-      (2,0,0) -> do
-        let ps = parseDirectResponse (rspBody rsp)
-        now <- getCurrentTime
-        case lookup "error_code" ps of
-          Just _ | recover -> recoverAssociation am ps resolve prov at st
-          Nothing -> return $ handleAssociation am ps mb_dh prov now at st
-          _       ->
-            let msg = fromMaybe "" $ lookup "error" ps
-             in return $ Error $ "Unable to associate: " ++ msg
-      _ -> return $ Error "HTTP request failure"
+    withResponse ersp $ \rsp -> do
+      let ps = parseDirectResponse (rspBody rsp)
+      case rspCode rsp of
+        (2,0,0) -> do
+          now <- getCurrentTime
+          return $ handleAssociation am ps mb_dh prov now at st
+        (4,0,0) | recover   -> recoverAssociation am ps resolve prov at st
+                | otherwise -> let m = fromMaybe "" $ lookup "error" ps
+                                in return $ Error $ "Unable to associate: " ++ m
+        _ -> return $ Error "HTTP request failure"
 
 
 -- | Attempt to recover from an association failure
