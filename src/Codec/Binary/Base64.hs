@@ -1,13 +1,17 @@
 {- |
- 
+
   Module      :  Codec.Binary.Base64
   Copyright   :  (c) 2006-2008
 
   Maintainer      : 
   Stability       : unstable
   Portability     : GHC
-  
+
   Base64 decoding and encoding routines.
+
+  Note:
+  This module was taken from the mime package released by Galois, Inc.  The
+  original author is unknown.
 -}
 module Codec.Binary.Base64 
         ( encodeRaw         -- :: Bool -> [Word8] -> String
