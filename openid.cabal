@@ -13,8 +13,28 @@ build-type:         Simple
 tested-with:        GHC == 6.8.2
 
 
+flag split-base
+  default:     True
+  description: Use the new split base package.
+
 library
-  build-depends:   base, monadLib
-  exposed-modules: Network.OpenID
-  ghc-options:     -Wall
+  if flag(split-base)
+    build-depends: base >= 3, bytestring, containers
+  else
+    build-depends: base < 3
+  build-depends:   HTTP, monadLib, nano-hmac, network, time, xml
+  hs-source-dirs:  src
+  exposed-modules: Network.OpenID,
+                   Network.SSL,
+                   Codec.Binary.Base64,
+                   Codec.Encryption.DH,
+                   Text.XRDS
+  other-modules:   Network.OpenID.AssociationManager,
+                   Network.OpenID.Authentication,
+                   Network.OpenID.Discovery,
+                   Network.OpenID.Normalization,
+                   Network.OpenID.Response,
+                   Network.OpenID.Types,
+                   Network.OpenID.Utils
+  ghc-options:     -W
   extra-libraries: crypto, ssl
