@@ -136,7 +136,7 @@ macHash HmacSha256 = HMAC.sha256
 
 
 -- | Make an HTTP request, and run a function with a successful response
-withResponse :: (ExceptionM m Error, BaseM m IO)
+withResponse :: ExceptionM m Error
              => Either ConnError Response -> (Response -> m a) -> m a
 withResponse (Left  err) _ = raise $ Error $ show err
 withResponse (Right rsp) f = f rsp
@@ -254,23 +254,51 @@ handleAssociation am ps mb_dh prov now at st = do
 
 
 -- | Verify a signature on a set of params.
-verifySignature :: AssociationManager am => am -> Params -> Either Error ()
-verifySignature am ps = runId $ runExceptionT $ do
-  mode <- lookupParam "openid.mode" ps
-  unless (mode == "id_res") $ raise $ Error $ "unexpected openid.mode: " ++ mode
-  sigParams <- breaks (',' ==) `fmap` lookupParam "openid.signed" ps
-  p   <- parseProvider' =<< lookupParam "openid.op_endpoint" ps
-  sig <- decode `fmap` lookupParam "openid.sig" ps
-  sps <- getSignedFields sigParams ps
-  a   <- let err = raise $ Error $ "no association for: " ++ show p
-          in maybe err return (findAssociation am p)
-  let h    = macHash (assocType a)
-      msg  = map (toEnum . fromEnum) (formatDirectParams sps)
-      mc   = HMAC.unsafeHMAC h (BS.pack (assocMacKey a)) (BS.pack msg)
-      sig' = case readHex mc of
-        [(x,"")] -> unroll x
-        _        -> []
-  unless (sig' == sig) $ raise $ Error "invalid signature"
+verifySignature :: AssociationManager am
+                => am -> Params -> ReturnTo -> Resolver -> IO (Either Error ())
+verifySignature am ps rto resolve =
+  runExceptionT $ do
+    prov <- parseProvider' =<< lookupParam "openid.op_endpoint" ps
+    case findAssociation am prov of
+      Nothing    -> directly prov
+      Just assoc -> withAssoc assoc
+
+  where
+
+  directly prov = do
+    let body = formatParams
+             $ ("openid.mode","check_authentication")
+             : filter (\p -> fst p == "openid.mode") ps
+    ersp <- inBase $ resolve Request
+      { rqURI     = providerURI prov
+      , rqMethod  = POST
+      , rqHeaders =
+        [ Header HdrContentLength $ show $ length body
+        , Header HdrContentType "application/x-www-form-urlencoded"
+        ]
+      , rqBody    = body
+      }
+    withResponse ersp $ \rsp -> do
+      let rps = parseDirectResponse (rspBody rsp)
+      case lookup "is_valid" rps of
+        Just "true" -> return ()
+        _           -> raise (Error "invalid authentication request")
+
+  withAssoc a = do
+    u <- lookupParam "openid.return_to" ps
+    unless (u == rto) $ raise $ Error $ "invalid return path: " ++ u
+    mode <- lookupParam "openid.mode" ps
+    unless (mode == "id_res") $ raise $ Error $ "unexpected openid.mode: " ++ mode
+    sigParams <- breaks (',' ==) `fmap` lookupParam "openid.signed" ps
+    sig <- decode `fmap` lookupParam "openid.sig" ps
+    sps <- getSignedFields sigParams ps
+    let h    = macHash (assocType a)
+        msg  = map (toEnum . fromEnum) (formatDirectParams sps)
+        mc   = HMAC.unsafeHMAC h (BS.pack (assocMacKey a)) (BS.pack msg)
+        sig' = case readHex mc of
+          [(x,"")] -> unroll x
+          _        -> []
+    unless (sig' == sig) $ raise $ Error "invalid signature"
 
 
 -- | Parse a provider within the Result monad

@@ -25,4 +25,5 @@ main = withSocketsDo $ do
               let au = authenticationURI am Setup p i check Nothing
               print au
               line <- getLine
-              print (verifySignature am params)
+              let params = parseParams line
+              print =<< verifySignature am params check resolve
