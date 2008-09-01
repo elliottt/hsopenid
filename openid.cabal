@@ -32,6 +32,7 @@ library
   other-modules:   Network.OpenID.AssociationManager,
                    Network.OpenID.Authentication,
                    Network.OpenID.Discovery,
+                   Network.OpenID.HTTP,
                    Network.OpenID.Normalization,
                    Network.OpenID.Response,
                    Network.OpenID.Types,
