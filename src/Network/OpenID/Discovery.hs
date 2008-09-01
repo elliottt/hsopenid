@@ -21,7 +21,6 @@ import Network.OpenID.Types
 import Text.XRDS
 
 -- Libraries
-import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
