@@ -167,7 +167,7 @@ readParam k ps = readM err =<< lookupParam k ps
 
 -- | Associate with a provider.
 --   By default, this tries to use DH-SHA256 and HMAC-SHA256, and falls back to
---   whatever the server recommends.
+--   whatever the server recommends, if the Bool parameter is True.
 associate :: AssociationManager am
           => am -> Bool -> Resolver -> Provider -> IO (Either Error am)
 associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
@@ -179,41 +179,45 @@ associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
 associate' :: AssociationManager am
            => am -> Bool -> Resolver -> Provider -> AssocType -> SessionType
            -> IO (Either Error am)
-associate' am recover resolve prov at st =
-  runExceptionT $ case validPairing at st of
-    False -> raise $ Error "invalid association and session type pairing"
-    True  -> do
-      mb_dh <- inBase (newSessionTypeParams st)
-      let body = formatParams
-               $ ("openid.ns", openidNS)
-               : ("openid.mode", "associate")
-               : ("openid.assoc_type", show at)
-               : ("openid.session_type", show st)
-               : maybe [] dhPairs mb_dh
-      ersp <- inBase $ resolve Request
-        { rqMethod  = POST
-        , rqURI     = providerURI prov
-        , rqHeaders =
-          [ Header HdrContentLength $ show $ length body
-          , Header HdrContentType "application/x-www-form-urlencoded"
-          ]
-        , rqBody    = body
-        }
-      withResponse ersp $ \rsp -> do
-        let ps = parseDirectResponse (rspBody rsp)
-        case rspCode rsp of
-          (2,0,0) -> do
-            now <- inBase getCurrentTime
-            handleAssociation am ps mb_dh prov now at st
-          (4,0,0)
-            | recover ->
-                let f = either raise return
-                    m = inBase (recoverAssociation am ps resolve prov at st)
-                 in f =<< m
-            | otherwise ->
-                let m = maybe "" (": " ++) (lookup "error" ps)
-                 in raise $ Error $ "unable to associate" ++ m
-          _ -> raise $ Error "unexpected HTTP response"
+associate' am' recover resolve prov at st = do
+  now <- getCurrentTime
+  let am = expire am' now
+  if isJust (findAssociation am prov)
+    then return (Right am)
+    else runExceptionT $ case validPairing at st of
+      False -> raise $ Error "invalid association and session type pairing"
+      True  -> do
+        mb_dh <- inBase (newSessionTypeParams st)
+        let body = formatParams
+                 $ ("openid.ns", openidNS)
+                 : ("openid.mode", "associate")
+                 : ("openid.assoc_type", show at)
+                 : ("openid.session_type", show st)
+                 : maybe [] dhPairs mb_dh
+        ersp <- inBase $ resolve Request
+          { rqMethod  = POST
+          , rqURI     = providerURI prov
+          , rqHeaders =
+            [ Header HdrContentLength $ show $ length body
+            , Header HdrContentType "application/x-www-form-urlencoded"
+            ]
+          , rqBody    = body
+          }
+        withResponse ersp $ \rsp -> do
+          let ps = parseDirectResponse (rspBody rsp)
+          case rspCode rsp of
+            (2,0,0) -> do
+              now <- inBase getCurrentTime
+              handleAssociation am ps mb_dh prov now at st
+            (4,0,0)
+              | recover ->
+                  let f = either raise return
+                      m = inBase (recoverAssociation am ps resolve prov at st)
+                   in f =<< m
+              | otherwise ->
+                  let m = maybe "" (": " ++) (lookup "error" ps)
+                   in raise $ Error $ "unable to associate" ++ m
+            _ -> raise $ Error "unexpected HTTP response"
 
 
 -- | Attempt to recover from an association failure
