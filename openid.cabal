@@ -28,6 +28,7 @@ library
                    Network.SSL,
                    Codec.Binary.Base64,
                    Codec.Encryption.DH,
+                   Data.Digest.OpenSSL.SHA,
                    Text.XRDS
   other-modules:   Network.OpenID.AssociationManager,
                    Network.OpenID.Authentication,
