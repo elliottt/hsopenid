@@ -35,8 +35,10 @@ library
                    Network.OpenID.Discovery,
                    Network.OpenID.HTTP,
                    Network.OpenID.Normalization,
-                   Network.OpenID.Response,
                    Network.OpenID.Types,
                    Network.OpenID.Utils
   ghc-options:     -W
+  extensions:      EmptyDataDecls,
+                   FlexibleContexts,
+                   ForeignFunctionInterface
   extra-libraries: crypto, ssl

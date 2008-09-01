@@ -27,9 +27,6 @@ module Network.OpenID.Utils (
   , readM
   ) where
 
--- Friends
-import Network.OpenID.Types
-
 -- Libraries
 import Data.Bits
 import Data.Char
@@ -37,7 +34,6 @@ import Data.List
 import Data.Maybe
 import Data.Word
 import MonadLib
-import Network.URI
 
 
 -- General Helpers -------------------------------------------------------------
