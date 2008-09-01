@@ -7,7 +7,7 @@
 -- |
 -- Module      : Network.SSL
 -- Copyright   : (c) Trevor Elliott, 2008
--- License     : AllRightsReserved
+-- License     : BSD3
 --
 -- Maintainer  : Trevor Elliott <trevor@geekgateway.com>
 -- Stability   :
