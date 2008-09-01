@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -31,12 +32,12 @@ import Network.OpenID.Types
 import Network.OpenID.Utils
 
 -- Libraries
-import Control.Monad
 import Data.Bits
 import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Word
+import MonadLib
 import Network.HTTP hiding (Result)
 import Numeric
 
@@ -129,9 +130,9 @@ macHash HmacSha256 = HMAC.sha256
 
 
 -- | Make an HTTP request, and run a function with a successful response
-withResponse :: Either ConnError Response -> (Response -> IO (Result a))
-             -> IO (Result a)
-withResponse (Left  err) _ = return $ Error $ show err
+withResponse :: (ExceptionM m Error, BaseM m IO)
+             => Either ConnError Response -> (Response -> m a) -> m a
+withResponse (Left  err) _ = raise $ Error $ show err
 withResponse (Right rsp) f = f rsp
 
 
@@ -142,6 +143,18 @@ decodeMacKey st mac pubKey dh = zipWith xor key mac
   where  key = hash st $ btwoc $ computeKey pubKey dh
 
 
+-- | Lookup parameters inside an exception handling monad
+lookupParam :: ExceptionM m Error => String -> Params -> m String
+lookupParam k ps = maybe err return (lookup k ps)
+  where err = raise $ Error $ "field not present: " ++ k
+
+
+-- | Read a field
+readParam :: (Read a, ExceptionM m Error) => String -> Params -> m a
+readParam k ps = readM err =<< lookupParam k ps
+  where err = Error ("unable to read field: " ++ k)
+
+
 --------------------------------------------------------------------------------
 -- Interface
 
@@ -150,7 +163,7 @@ decodeMacKey st mac pubKey dh = zipWith xor key mac
 --   By default, this tries to use DH-SHA256 and HMAC-SHA256, and falls back to
 --   whatever the server recommends.
 associate :: AssociationManager am
-          => am -> Bool -> Resolver -> Provider -> IO (Result am)
+          => am -> Bool -> Resolver -> Provider -> IO (Either Error am)
 associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
 
 
@@ -159,63 +172,69 @@ associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
 --   upon a failed request.
 associate' :: AssociationManager am
            => am -> Bool -> Resolver -> Provider -> AssocType -> SessionType
-           -> IO (Result am)
-associate' am recover resolve prov at st
-  | not (validPairing at st) =
-      return $ Error "Invalid association and session type pairing"
-  | otherwise = do
-    mb_dh <- newSessionTypeParams st
-    let body = formatParams
-             $ ("openid.ns", openidNS)
-             : ("openid.mode", "associate")
-             : ("openid.assoc_type", show at)
-             : ("openid.session_type", show st)
-             : maybe [] dhPairs mb_dh
-    ersp <- resolve Request
-      { rqMethod  = POST
-      , rqURI     = providerURI prov
-      , rqHeaders = [ Header HdrContentLength $ show $ length body
-                    , Header HdrContentType "application/x-www-form-urlencoded"
-                    ]
-      , rqBody    = body
-      }
-    withResponse ersp $ \rsp -> do
-      let ps = parseDirectResponse (rspBody rsp)
-      case rspCode rsp of
-        (2,0,0) -> do
-          now <- getCurrentTime
-          return $ handleAssociation am ps mb_dh prov now at st
-        (4,0,0) | recover   -> recoverAssociation am ps resolve prov at st
-                | otherwise -> let m = fromMaybe "" $ lookup "error" ps
-                                in return $ Error $ "Unable to associate: " ++ m
-        _ -> return $ Error "HTTP request failure"
+           -> IO (Either Error am)
+associate' am recover resolve prov at st =
+  runExceptionT $ case validPairing at st of
+    False -> raise $ Error "invalid association and session type pairing"
+    True  -> do
+      mb_dh <- inBase (newSessionTypeParams st)
+      let body = formatParams
+               $ ("openid.ns", openidNS)
+               : ("openid.mode", "associate")
+               : ("openid.assoc_type", show at)
+               : ("openid.session_type", show st)
+               : maybe [] dhPairs mb_dh
+      ersp <- inBase $ resolve Request
+        { rqMethod  = POST
+        , rqURI     = providerURI prov
+        , rqHeaders =
+          [ Header HdrContentLength $ show $ length body
+          , Header HdrContentType "application/x-www-form-urlencoded"
+          ]
+        , rqBody    = body
+        }
+      withResponse ersp $ \rsp -> do
+        let ps = parseDirectResponse (rspBody rsp)
+        case rspCode rsp of
+          (2,0,0) -> do
+            now <- inBase getCurrentTime
+            handleAssociation am ps mb_dh prov now at st
+          (4,0,0)
+            | recover ->
+                let f = either raise return
+                    m = inBase (recoverAssociation am ps resolve prov at st)
+                 in f =<< m
+            | otherwise ->
+                let m = maybe "" (": " ++) (lookup "error" ps)
+                 in raise $ Error $ "unable to associate" ++ m
+          _ -> raise $ Error "unexpected HTTP response"
 
 
 -- | Attempt to recover from an association failure
 recoverAssociation :: AssociationManager am
-                   => am -> Params -> Resolver -> Provider -> AssocType
-                   -> SessionType -> IO (Result am)
+                   => am -> Params -> Resolver -> Provider
+                   -> AssocType -> SessionType
+                   -> IO (Either Error am)
 recoverAssociation am ps res prov at st = associate' am False res prov
   (l at "assoc_type") (l st "session_type")
   where l d k = fromMaybe d (readMaybe =<< lookup k ps)
 
 
 -- | Handle the response to an associate request.
-handleAssociation :: AssociationManager am
+handleAssociation :: (Functor m, ExceptionM m Error, AssociationManager am)
                   => am -> Params -> Maybe DHParams -> Provider -> UTCTime
                   -> AssocType -> SessionType
-                  -> Result am
+                  -> m am
 handleAssociation am ps mb_dh prov now at st = do
-  let l k = maybeToResult ("field not present: " ++ k) (lookup k ps)
-  ah <- l "assoc_handle"
-  ei <- readResult =<< l "expires_in"
+  ah <- lookupParam "assoc_handle" ps
+  ei <- readParam   "expires_in"   ps
   mk <- case (st,mb_dh) of
-    (NoEncryption,_) -> decode `fmap` l "mac_key"
+    (NoEncryption,_) -> decode `fmap` lookupParam "mac_key" ps
     (_,Just dh)      -> do
-      mk     <- l "enc_mac_key"
-      pubKey <- l "dh_server_public"
+      mk     <- lookupParam "enc_mac_key"      ps
+      pubKey <- lookupParam "dh_server_public" ps
       return $ decodeMacKey st (decode mk) (decode pubKey) dh
-    _ -> Error "Diffie-Hellman parameters not generated"
+    _ -> raise (Error "Diffie-Hellman parameters not generated")
   return $ addAssociation am now prov Association
     { assocExpiresIn = ei
     , assocHandle    = ah
@@ -225,35 +244,34 @@ handleAssociation am ps mb_dh prov now at st = do
 
 
 -- | Verify a signature on a set of params.
-verifySignature :: AssociationManager am => am -> Params -> Result ()
-verifySignature am ps = do
-  let l k = maybeToResult ("field not present: " ++ k) (lookup k ps)
-  mode      <- l "openid.mode"
-  unless (mode == "id_res") $ fail $ "unexpected openid.mode: " ++ mode
-  p         <- parseProvider' =<< l "openid.op_endpoint"
-  sigParams <- breaks (',' ==) `fmap` l "openid.signed"
-  sig       <- decode `fmap` l "openid.sig"
-  sps       <- getSignedFields sigParams ps
-  a         <- maybeToResult ("No association present for " ++ show p)
-               (findAssociation am p)
+verifySignature :: AssociationManager am => am -> Params -> Either Error ()
+verifySignature am ps = runId $ runExceptionT $ do
+  mode <- lookupParam "openid.mode" ps
+  unless (mode == "id_res") $ raise $ Error $ "unexpected openid.mode: " ++ mode
+  sigParams <- breaks (',' ==) `fmap` lookupParam "openid.signed" ps
+  p   <- parseProvider' =<< lookupParam "openid.op_endpoint" ps
+  sig <- decode `fmap` lookupParam "openid.sig" ps
+  sps <- getSignedFields sigParams ps
+  a   <- let err = raise $ Error $ "no association for: " ++ show p
+          in maybe err return (findAssociation am p)
   let h    = macHash (assocType a)
-      msg  = map (toEnum . fromEnum) $ formatDirectParams sps
-      mc   = HMAC.unsafeHMAC h (BS.pack $ assocMacKey a) (BS.pack msg)
+      msg  = map (toEnum . fromEnum) (formatDirectParams sps)
+      mc   = HMAC.unsafeHMAC h (BS.pack (assocMacKey a)) (BS.pack msg)
       sig' = case readHex mc of
         [(x,"")] -> unroll x
         _        -> []
-  unless (sig' == sig) (fail "invalid signature")
+  unless (sig' == sig) $ raise $ Error "invalid signature"
 
 
 -- | Parse a provider within the Result monad
-parseProvider' :: String -> Result Provider
-parseProvider' = maybeToResult msg . parseProvider
-  where msg = "unable to parse openid.op_endpoint"
+parseProvider' :: ExceptionM m Error => String -> m Provider
+parseProvider' = maybe err return . parseProvider
+  where err = raise (Error "unable to parse openid.op_endpoint")
 
 
 -- | Get the signed fields from a set of parameters
-getSignedFields :: [String] -> Params -> Result Params
-getSignedFields ks ps = maybeToResult msg (mapM lkp ks)
+getSignedFields :: ExceptionM m Error => [String] -> Params -> m Params
+getSignedFields ks ps = maybe err return (mapM lkp ks)
   where
-    msg = "not all signed parameters present"
+    err = raise (Error "not all signed parameters present")
     lkp k = (,) k `fmap` lookup ("openid." ++ k) ps

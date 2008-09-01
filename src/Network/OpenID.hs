@@ -14,6 +14,7 @@ module Network.OpenID (
     module Network.OpenID.AssociationManager
   , module Network.OpenID.Authentication
   , module Network.OpenID.Discovery
+  , module Network.OpenID.HTTP
   , module Network.OpenID.Normalization
   , module Network.OpenID.Types
   , module Network.OpenID.Utils
@@ -23,6 +24,7 @@ module Network.OpenID (
 import Network.OpenID.AssociationManager
 import Network.OpenID.Authentication
 import Network.OpenID.Discovery
+import Network.OpenID.HTTP
 import Network.OpenID.Normalization
 import Network.OpenID.Types
 import Network.OpenID.Utils

@@ -22,10 +22,12 @@ module Network.OpenID.Utils (
   , unroll
   , btwoc
 
+    -- * OpenID Defaults
   , defaultModulus
   , openidNS
-  , guardResponse
-  , readResult
+
+    -- * MonadLib helpers
+  , readM
   ) where
 
 -- Friends
@@ -37,6 +39,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
+import MonadLib
 import Network.URI
 
 
@@ -118,16 +121,8 @@ openidNS :: String
 openidNS  = "http://specs.openid.net/auth/2.0"
 
 
--- | Guard against an error in a server response
-guardResponse :: Monad m => Params -> m (Result a) -> m (Result a)
-guardResponse ps m = case lookup "error_code" ps of
-  Nothing -> m
-  Just ec -> return (Error msg)
-    where msg = ec ++ ": " ++ fromMaybe "" (lookup "error" ps)
-
-
--- | Read in a Result
-readResult :: Read a => String -> Result a
-readResult str = case reads str of
-  [(x,"")] -> Result x
-  _        -> Error "Unable to read"
+-- | Read inside of an Exception monad
+readM :: (ExceptionM m e, Read a) => e -> String -> m a
+readM e str = case reads str of
+  [(x,"")] -> return x
+  _        -> raise e

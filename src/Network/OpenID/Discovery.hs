@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -24,30 +25,39 @@ import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
+import MonadLib
 import Network.HTTP hiding (Result)
 import Network.URI
 
 
--- | Attempt to resolve an OpenID endpoint, and user identifier.
-discover :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
-discover resolve ident = do
-  res <- discoverYADIS resolve ident Nothing
-  case res of
-    Result {} -> return res
-    _         -> discoverHTML resolve ident
+type M = ExceptionT Error IO
 
+io :: IO a -> M a
+io  = inBase
+
+
+-- | Attempt to resolve an OpenID endpoint, and user identifier.
+discover :: Resolver -> Identifier -> IO (Either Error (Provider,Identifier))
+discover resolve ident = do
+  res <- runExceptionT (discoverYADIS resolve ident Nothing)
+  case res of
+    Right {} -> return res
+    _        -> runExceptionT (discoverHTML resolve ident)
+
+
+-- YADIS-Based Discovery -------------------------------------------------------
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
 --   an OpenID endpoint, and the actual identifier for the user.
 discoverYADIS :: Resolver -> Identifier -> Maybe String
-              -> IO (Result (Provider,Identifier))
+              -> M (Provider,Identifier)
 discoverYADIS resolve ident mb_loc = do
-  let err = return . Error
+  let err = raise . Error
       uri = fromMaybe (getIdentifier ident) mb_loc
   case parseURI uri of
     Nothing  -> err "Unable to parse identifier as a URI"
     Just uri -> do
-      estr <- resolve Request
+      estr <- io $ resolve Request
         { rqMethod  = GET
         , rqURI     = uri
         , rqHeaders = []
@@ -58,17 +68,21 @@ discoverYADIS resolve ident mb_loc = do
         Right rsp -> case rspCode rsp of
           (2,0,0) -> case findHeader (HdrCustom "X-XRDS-Location") rsp of
             Just loc -> discoverYADIS resolve ident (Just loc)
-            _        -> return $
-              maybeToResult "YADIS document doesn't include an OpenID provider"
-              (parseYADIS ident =<< parseXRDS (rspBody rsp))
+            _        -> do
+              let e = err "Unable to parse YADIS document"
+              doc <- maybe e return $ parseXRDS $ rspBody rsp
+              parseYADIS ident doc
           _       -> err "HTTP request error: unexpected response code"
 
 
 -- | Parse out an OpenID endpoint, and actual identifier from a YADIS xml
 -- document.
-parseYADIS :: Identifier -> XRDS -> Maybe (Provider,Identifier)
-parseYADIS ident = join . listToMaybe . map isOpenId . concat
+parseYADIS :: ExceptionM m Error
+           => Identifier -> XRDS -> m (Provider,Identifier)
+parseYADIS ident = handleError . listToMaybe . mapMaybe isOpenId . concat
   where
+  handleError = maybe e return
+    where e = raise (Error "YADIS document doesn't include an OpenID provider")
   isOpenId svc = do
     let tys = serviceTypes svc
         localId = maybe ident Identifier $ listToMaybe $ serviceLocalIDs svc
@@ -85,15 +99,17 @@ parseYADIS ident = join . listToMaybe . map isOpenId . concat
     return (uri,lid)
 
 
+-- HTML-Based Discovery --------------------------------------------------------
+
 -- | Attempt to discover an OpenID endpoint, from an HTML document.  The result
 -- will be an endpoint on success, and the actual identifier of the user.
-discoverHTML :: Resolver -> Identifier -> IO (Result (Provider,Identifier))
-discoverHTML resolve ident =
-  let err = return . Error in
+discoverHTML :: Resolver -> Identifier -> M (Provider,Identifier)
+discoverHTML resolve ident = do
+  let err = raise . Error
   case parseURI (getIdentifier ident) of
     Nothing  -> err "Unable to parse identifier as a URI"
     Just uri -> do
-      estr <- resolve Request
+      estr <- io $ resolve Request
         { rqMethod  = GET
         , rqURI     = uri
         , rqHeaders = []
@@ -102,8 +118,8 @@ discoverHTML resolve ident =
       case estr of
         Left  e   -> err $ "HTTP request error: " ++ show e
         Right rsp -> case rspCode rsp of
-          (2,0,0) -> return $ maybeToResult "Unable to find identifier in HTML"
-                            $ parseHTML ident $ rspBody rsp
+          (2,0,0) -> maybe (err "Unable to find identifier in HTML") return
+                       $ parseHTML ident $ rspBody rsp
           _       -> err "HTTP request error: unexpected response code"
 
 

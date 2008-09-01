@@ -24,17 +24,10 @@ module Network.OpenID.Types (
   , providerURI
   , modifyProvider
   , Identifier(..)
-
-    -- * Result Monad
-  , Result(..)
-  , result
-  , resultToMaybe
-  , maybeToResult
-  , eitherToResult
+  , Error(..)
   ) where
 
 -- Libraries
-import Control.Applicative
 import Control.Monad
 import Data.List
 import Data.Word
@@ -112,48 +105,5 @@ modifyProvider f (Provider uri) = Provider (f uri)
 -- | A valid OpenID identifier.
 newtype Identifier = Identifier { getIdentifier :: String } deriving (Eq,Show)
 
--- | The result Monad
-data Result a = Error String | Result a deriving Show
-
-instance Functor Result where
-  fmap f (Result x)  = Result (f x)
-  fmap _ (Error err) = Error err
-
-instance Applicative Result where
-  pure = Result
-  Result f  <*> Result x  = Result (f x)
-  Result _  <*> Error err = Error err
-  Error err <*> _         = Error err
-
-instance Alternative Result where
-  empty = Error "empty"
-  r@(Result _) <|> _ = r
-  _            <|> r = r
-
-instance Monad Result where
-  return = Result
-  fail   = Error
-  Result x   >>= f = f x
-  Error  err >>= _ = Error err
-
-instance MonadPlus Result where
-  mzero = Error "mzero"
-  mplus r@(Result _) _ = r
-  mplus   (Error _)  r = r
-
--- | Case analysis for the Result type
-result :: (String -> b) -> (a -> b) -> Result a -> b
-result f _ (Error e)  = f e
-result _ g (Result x) = g x
-
--- | Turn a Result into a Maybe
-resultToMaybe :: Result a -> Maybe a
-resultToMaybe  = result (const Nothing) Just
-
--- | Turn a Maybe into a Result
-maybeToResult :: String -> Maybe a -> Result a
-maybeToResult err mb = maybe (Error err) Result mb
-
--- | Turn an Either into a Result
-eitherToResult :: Show a => Either a b -> Result b
-eitherToResult  = either (Error . show) Result
+-- | Errors
+newtype Error = Error String deriving Show
