@@ -52,10 +52,7 @@ instance Stream SSLHandle where
       upd bs = map (toEnum . fromEnum) bs ++ "\n"
   readBlock  sh n  = wrap (map (toEnum . fromEnum) `fmap` sslRead sh n)
   writeBlock sh bs = wrap $ sslWrite sh $ map (toEnum . fromEnum) bs
-  close (SH (ssl,ctx,sock)) = do
-    finalizeForeignPtr ssl
-    finalizeForeignPtr ctx
-    sClose sock
+  close (SH (_,_,sock)) = sClose sock
 
 
 

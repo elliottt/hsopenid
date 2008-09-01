@@ -17,6 +17,7 @@ module Network.OpenID.HTTP (
     -- * Request/Response Parsing and Formatting
   , parseDirectResponse
   , formatParams
+  , formatDirectParams
   , escapeParam
   , addParams
   , parseParams
@@ -35,21 +36,43 @@ import Network.HTTP
 import Network.Socket
 import Network.URI
 
--- | Perform an http request
-makeRequest :: Resolver
-makeRequest req = case getAuthority (rqURI req) of
+
+-- | Perform an http request.
+--   If the Bool parameter is set to True, redirects from the server will be
+--   followed.
+makeRequest :: Bool -> Resolver
+makeRequest followRedirect req = case getAuthority (rqURI req) of
   Left err -> return (Left err)
   Right (host,port) -> do
     hi   <- getHostByName host
     sock <- socket AF_INET Stream 0
     connect sock $ SockAddrInet port $ head $ hostAddresses hi
-    if uriScheme (rqURI req) == "https:"
-      then inBase $ do
-        mb_sh <- inBase (sslConnect sock)
-        case mb_sh of
-          Nothing -> return $ Left $ ErrorMisc "sslConnect failed"
-          Just sh -> simpleHTTP_ sh req
-      else simpleHTTP_ sock req
+    ersp <- if uriScheme (rqURI req) == "https:"
+              then inBase $ do
+                mb_sh <- inBase (sslConnect sock)
+                case mb_sh of
+                  Nothing -> return $ Left $ ErrorMisc "sslConnect failed"
+                  Just sh -> simpleHTTP_ sh req
+              else simpleHTTP_ sock req
+    withResponse ersp (handleRedirect followRedirect req)
+
+
+-- | Run some computation with a successful response from simpleHTTP_
+withResponse :: Either ConnError Response
+             -> (Response -> IO (Either ConnError a))
+             -> IO (Either ConnError a)
+withResponse (Left e)  _ = return (Left e)
+withResponse (Right r) f = f r
+
+
+-- | Follow a redirect
+handleRedirect :: Bool -> Request -> Response -> IO (Either ConnError Response)
+handleRedirect False _   rsp = return (Right rsp)
+handleRedirect _     req rsp = case rspCode rsp of
+  (3,0,2) -> case parseURI =<< findHeader HdrLocation rsp of
+    Just uri -> makeRequest False req { rqURI = uri }
+    Nothing  -> return (Right rsp)
+  _       -> return (Right rsp)
 
 
 -- | Get the port and hostname associated with an http request
@@ -81,8 +104,14 @@ parseDirectResponse  = unfoldr step
 
 -- | Format OpenID parameters as a query string
 formatParams :: Params -> String
-formatParams  = concat . intersperse "&" . map f
+formatParams  = intercalate "&" . map f
   where f (x,y) = x ++ "=" ++ escapeParam y
+
+
+-- | Format OpenID parameters as a direct response
+formatDirectParams :: Params -> String
+formatDirectParams  = concatMap f
+  where f (x,y) = x ++ ":" ++ y ++ "\n"
 
 
 -- | Escape for the query string of a URI

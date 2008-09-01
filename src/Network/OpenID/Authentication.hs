@@ -20,6 +20,7 @@ module Network.OpenID.Authentication (
 
 -- Friends
 import Network.OpenID.AssociationManager
+import Network.OpenID.HTTP
 import Network.OpenID.Types
 import Network.OpenID.Utils
 

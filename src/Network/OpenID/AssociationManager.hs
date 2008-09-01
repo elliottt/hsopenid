@@ -27,7 +27,7 @@ module Network.OpenID.AssociationManager (
 import Codec.Binary.Base64
 import Codec.Encryption.DH
 import Data.Digest.OpenSSL.SHA
-import Network.OpenID.Response
+import Network.OpenID.HTTP
 import Network.OpenID.Types
 import Network.OpenID.Utils
 
@@ -61,6 +61,9 @@ class AssociationManager am where
   --   parameter.
   expire :: am -> UTCTime -> am
 
+  -- | Export all associations, and their expirations
+  exportAssociations :: am -> [(String,UTCTime,Association)]
+
 
 -- | A simple association manager based on Data.Map
 newtype AssociationMap = AM (Map.Map String (UTCTime,Association))
@@ -73,6 +76,9 @@ instance AssociationManager AssociationMap where
     where expire = addUTCTime (toEnum (assocExpiresIn a)) now
 
   expire (AM m) now = AM (Map.filter ((now >) . fst) m)
+
+  exportAssociations (AM m) = map f (Map.toList m)
+    where f (p,(t,a)) = (p,t,a)
 
 
 -- | An empty association map.
