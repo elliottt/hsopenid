@@ -11,7 +11,15 @@
 --
 
 module Network.OpenID.HTTP (
+    -- * Request Interface
     makeRequest
+
+    -- * Request/Response Parsing and Formatting
+  , parseDirectResponse
+  , formatParams
+  , escapeParam
+  , addParams
+  , parseParams
   ) where
 
 -- friends
@@ -20,12 +28,12 @@ import Network.OpenID.Utils
 import Network.SSL
 
 -- libraries
+import Data.List
 import MonadLib
 import Network.BSD
 import Network.HTTP
 import Network.Socket
 import Network.URI
-
 
 -- | Perform an http request
 makeRequest :: Resolver
@@ -59,3 +67,44 @@ getAuthority uri = case uriAuthority uri of
      in case port of
           Nothing -> Left $ ErrorMisc "Unable to parse port number"
           Just p  -> Right (host,p)
+
+-- Parsing and Formatting ------------------------------------------------------
+
+-- | Turn a response body into a list of parameters.
+parseDirectResponse :: String -> Params
+parseDirectResponse  = unfoldr step
+  where
+    step []  = Nothing
+    step str = case split (== '\n') str of
+      (ps,rest) -> Just (split (== ':') ps,rest)
+
+
+-- | Format OpenID parameters as a query string
+formatParams :: Params -> String
+formatParams  = concat . intersperse "&" . map f
+  where f (x,y) = x ++ "=" ++ escapeParam y
+
+
+-- | Escape for the query string of a URI
+escapeParam :: String -> String
+escapeParam  = escapeURIString isUnreserved
+
+
+-- | Add Parameters to a URI
+addParams :: Params -> URI -> URI
+addParams ps uri = uri { uriQuery = query }
+  where
+    f (k,v) = (k,v)
+    ps' = map f ps
+    query = '?' : formatParams (parseParams (uriQuery uri) ++ ps')
+
+
+-- | Parse OpenID parameters out of a url string
+parseParams :: String -> Params
+parseParams xs = case split (== '?') xs of
+  (_,bs) -> unfoldr step bs
+  where
+    step [] = Nothing
+    step bs = case split (== '&') bs of
+      (as,rest) -> case split (== '=') as of
+        (k,v) -> Just ((k, unEscapeString v),rest)
