@@ -1,4 +1,5 @@
 
+import MonadLib
 import Network.OpenID
 import Network.SSL
 
@@ -26,4 +27,4 @@ main = withSocketsDo $ do
               print au
               line <- getLine
               let params = parseParams line
-              print =<< verifySignature am params check resolve
+              print =<< verifyAuthentication am params check resolve

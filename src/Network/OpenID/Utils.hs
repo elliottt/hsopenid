@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -25,15 +26,22 @@ module Network.OpenID.Utils (
 
     -- * MonadLib helpers
   , readM
+  , lookupParam
+  , readParam
+  , withResponse
   ) where
 
--- Libraries
+-- friends
+import Network.OpenID.Types
+
+-- libraries
 import Data.Bits
 import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
 import MonadLib
+import Network.HTTP
 
 
 -- General Helpers -------------------------------------------------------------
@@ -100,3 +108,22 @@ readM :: (ExceptionM m e, Read a) => e -> String -> m a
 readM e str = case reads str of
   [(x,"")] -> return x
   _        -> raise e
+
+
+-- | Lookup parameters inside an exception handling monad
+lookupParam :: ExceptionM m Error => String -> Params -> m String
+lookupParam k ps = maybe err return (lookup k ps)
+  where err = raise $ Error $ "field not present: " ++ k
+
+
+-- | Read a field
+readParam :: (Read a, ExceptionM m Error) => String -> Params -> m a
+readParam k ps = readM err =<< lookupParam k ps
+  where err = Error ("unable to read field: " ++ k)
+
+
+-- | Make an HTTP request, and run a function with a successful response
+withResponse :: ExceptionM m Error
+             => Either ConnError Response -> (Response -> m a) -> m a
+withResponse (Left  err) _ = raise $ Error $ show err
+withResponse (Right rsp) f = f rsp

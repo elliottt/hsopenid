@@ -20,7 +20,6 @@ module Network.OpenID.AssociationManager (
     -- * Association
   , associate
   , associate'
-  , verifySignature
   ) where
 
 -- Friends
@@ -39,10 +38,7 @@ import Data.Time
 import Data.Word
 import MonadLib
 import Network.HTTP hiding (Result)
-import Numeric
 
-import qualified Data.ByteString as BS
-import qualified Data.Digest.OpenSSL.HMAC as HMAC
 import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
@@ -129,36 +125,11 @@ hash DhSha1       = sha1
 hash DhSha256     = sha256
 
 
--- | Get the mac hash type
-macHash :: AssocType -> HMAC.CryptoHashFunction
-macHash HmacSha1   = HMAC.sha1
-macHash HmacSha256 = HMAC.sha256
-
-
--- | Make an HTTP request, and run a function with a successful response
-withResponse :: ExceptionM m Error
-             => Either ConnError Response -> (Response -> m a) -> m a
-withResponse (Left  err) _ = raise $ Error $ show err
-withResponse (Right rsp) f = f rsp
-
-
 -- | Get the mac key from a set of Diffie-Hellman parameters, and the public
 --   key of the server.
 decodeMacKey :: SessionType -> [Word8] -> [Word8] -> DHParams -> [Word8]
 decodeMacKey st mac pubKey dh = zipWith xor key mac
   where  key = hash st $ btwoc $ computeKey pubKey dh
-
-
--- | Lookup parameters inside an exception handling monad
-lookupParam :: ExceptionM m Error => String -> Params -> m String
-lookupParam k ps = maybe err return (lookup k ps)
-  where err = raise $ Error $ "field not present: " ++ k
-
-
--- | Read a field
-readParam :: (Read a, ExceptionM m Error) => String -> Params -> m a
-readParam k ps = readM err =<< lookupParam k ps
-  where err = Error ("unable to read field: " ++ k)
 
 
 --------------------------------------------------------------------------------
@@ -253,63 +224,3 @@ handleAssociation am ps mb_dh prov now at st = do
     }
 
 
--- | Verify a signature on a set of params.
-verifySignature :: AssociationManager am
-                => am -> Params -> ReturnTo -> Resolver -> IO (Either Error ())
-verifySignature am ps rto resolve =
-  runExceptionT $ do
-    prov <- parseProvider' =<< lookupParam "openid.op_endpoint" ps
-    case findAssociation am prov of
-      Nothing    -> directly prov
-      Just assoc -> withAssoc assoc
-
-  where
-
-  directly prov = do
-    let body = formatParams
-             $ ("openid.mode","check_authentication")
-             : filter (\p -> fst p == "openid.mode") ps
-    ersp <- inBase $ resolve Request
-      { rqURI     = providerURI prov
-      , rqMethod  = POST
-      , rqHeaders =
-        [ Header HdrContentLength $ show $ length body
-        , Header HdrContentType "application/x-www-form-urlencoded"
-        ]
-      , rqBody    = body
-      }
-    withResponse ersp $ \rsp -> do
-      let rps = parseDirectResponse (rspBody rsp)
-      case lookup "is_valid" rps of
-        Just "true" -> return ()
-        _           -> raise (Error "invalid authentication request")
-
-  withAssoc a = do
-    u <- lookupParam "openid.return_to" ps
-    unless (u == rto) $ raise $ Error $ "invalid return path: " ++ u
-    mode <- lookupParam "openid.mode" ps
-    unless (mode == "id_res") $ raise $ Error $ "unexpected openid.mode: " ++ mode
-    sigParams <- breaks (',' ==) `fmap` lookupParam "openid.signed" ps
-    sig <- decode `fmap` lookupParam "openid.sig" ps
-    sps <- getSignedFields sigParams ps
-    let h    = macHash (assocType a)
-        msg  = map (toEnum . fromEnum) (formatDirectParams sps)
-        mc   = HMAC.unsafeHMAC h (BS.pack (assocMacKey a)) (BS.pack msg)
-        sig' = case readHex mc of
-          [(x,"")] -> unroll x
-          _        -> []
-    unless (sig' == sig) $ raise $ Error "invalid signature"
-
-
--- | Parse a provider within the Result monad
-parseProvider' :: ExceptionM m Error => String -> m Provider
-parseProvider' = maybe err return . parseProvider
-  where err = raise (Error "unable to parse openid.op_endpoint")
-
-
--- | Get the signed fields from a set of parameters
-getSignedFields :: ExceptionM m Error => [String] -> Params -> m Params
-getSignedFields ks ps = maybe err return (mapM lkp ks)
-  where
-    err = raise (Error "not all signed parameters present")
-    lkp k = (,) k `fmap` lookup ("openid." ++ k) ps

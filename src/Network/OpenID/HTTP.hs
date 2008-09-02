@@ -54,15 +54,9 @@ makeRequest followRedirect req = case getAuthority (rqURI req) of
                   Nothing -> return $ Left $ ErrorMisc "sslConnect failed"
                   Just sh -> simpleHTTP_ sh req
               else simpleHTTP_ sock req
-    withResponse ersp (handleRedirect followRedirect req)
-
-
--- | Run some computation with a successful response from simpleHTTP_
-withResponse :: Either ConnError Response
-             -> (Response -> IO (Either ConnError a))
-             -> IO (Either ConnError a)
-withResponse (Left e)  _ = return (Left e)
-withResponse (Right r) f = f r
+    case ersp of
+      Left  err -> return (Left err)
+      Right rsp -> handleRedirect followRedirect req rsp
 
 
 -- | Follow a redirect
