@@ -22,7 +22,7 @@ module Network.OpenID.Authentication (
 
 -- friends
 import Codec.Binary.Base64
-import Network.OpenID.AssociationManager
+import Network.OpenID.Association.Manager
 import Network.OpenID.HTTP
 import Network.OpenID.Types
 import Network.OpenID.Utils

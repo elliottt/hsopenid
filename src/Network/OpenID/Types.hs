@@ -33,7 +33,7 @@ import Data.List
 import Data.Word
 import Network.URI
 
-import qualified Network.HTTP as HTTP
+import Network.HTTP
 
 --------------------------------------------------------------------------------
 -- Types
@@ -75,6 +75,7 @@ data Association = Association
   , assocType      :: AssocType
   } deriving Show
 
+
 -- | Parameter lists for communication with the server
 type Params = [(String,String)]
 
@@ -85,10 +86,10 @@ type ReturnTo = String
 type Realm = String
 
 -- | A way to resolve an HTTP request
-type Resolver = (HTTP.Request -> IO (HTTP.Result HTTP.Response))
+type Resolver = Request -> IO (Either ConnError Response)
 
 -- | An OpenID provider.
-newtype Provider   = Provider { providerURI :: URI } deriving (Eq,Show)
+newtype Provider = Provider { providerURI :: URI } deriving (Eq,Show)
 
 -- | Parse a provider
 parseProvider :: String -> Maybe Provider
@@ -103,7 +104,8 @@ modifyProvider :: (URI -> URI) -> Provider -> Provider
 modifyProvider f (Provider uri) = Provider (f uri)
 
 -- | A valid OpenID identifier.
-newtype Identifier = Identifier { getIdentifier :: String } deriving (Eq,Show)
+newtype Identifier = Identifier { getIdentifier :: String }
+  deriving (Eq,Show,Read)
 
 -- | Errors
 newtype Error = Error String deriving Show

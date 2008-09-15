@@ -14,6 +14,10 @@ module Network.OpenID.HTTP (
     -- * Request Interface
     makeRequest
 
+    -- * HTTP Utilities
+  , getRequest
+  , postRequest
+
     -- * Request/Response Parsing and Formatting
   , parseDirectResponse
   , formatParams
@@ -84,6 +88,29 @@ getAuthority uri = case uriAuthority uri of
      in case port of
           Nothing -> Left $ ErrorMisc "Unable to parse port number"
           Just p  -> Right (host,p)
+
+-- Utilities -------------------------------------------------------------------
+
+
+getRequest :: URI -> Request
+getRequest uri = Request
+  { rqURI     = uri
+  , rqMethod  = GET
+  , rqHeaders = []
+  , rqBody    = ""
+  }
+
+
+postRequest :: URI -> String -> Request
+postRequest uri body = Request
+  { rqURI     = uri
+  , rqMethod  = POST
+  , rqHeaders =
+    [ Header HdrContentType "application/x-www-form-urlencoded"
+    , Header HdrContentLength $ show $ length body
+    ]
+  , rqBody    = body
+  }
 
 -- Parsing and Formatting ------------------------------------------------------
 

@@ -30,7 +30,9 @@ library
                    Codec.Encryption.DH,
                    Data.Digest.OpenSSL.SHA,
                    Text.XRDS
-  other-modules:   Network.OpenID.AssociationManager,
+  other-modules:   Network.OpenID.Association,
+                   Network.OpenID.Association.Manager,
+                   Network.OpenID.Association.Map,
                    Network.OpenID.Authentication,
                    Network.OpenID.Discovery,
                    Network.OpenID.HTTP,
