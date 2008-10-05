@@ -99,7 +99,7 @@ authenticationURI am mode prov ident rt mb_realm =
 
 -- | Verify a signature on a set of params.
 verifyAuthentication :: AssociationManager am
-                     => am -> Params -> ReturnTo -> Resolver
+                     => am -> Params -> ReturnTo -> Resolver IO
                      -> IO (Either Error ())
 verifyAuthentication am ps rto resolve =
   runExceptionT $ do
@@ -112,7 +112,7 @@ verifyAuthentication am ps rto resolve =
 
 
 -- | Verify an assertion directly
-verifyDirect :: Params -> Provider -> Resolver -> ExceptionT Error IO ()
+verifyDirect :: Params -> Provider -> Resolver IO -> ExceptionT Error IO ()
 verifyDirect ps prov resolve = do
   let body = formatParams
            $ ("openid.mode","check_authentication")

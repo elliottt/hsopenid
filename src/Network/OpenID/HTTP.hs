@@ -44,7 +44,7 @@ import Network.URI
 -- | Perform an http request.
 --   If the Bool parameter is set to True, redirects from the server will be
 --   followed.
-makeRequest :: Bool -> Resolver
+makeRequest :: Bool -> Resolver IO
 makeRequest followRedirect req = case getAuthority (rqURI req) of
   Left err -> return (Left err)
   Right (host,port) -> do

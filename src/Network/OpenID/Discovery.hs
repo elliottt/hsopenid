@@ -36,7 +36,7 @@ io  = inBase
 
 
 -- | Attempt to resolve an OpenID endpoint, and user identifier.
-discover :: Resolver -> Identifier -> IO (Either Error (Provider,Identifier))
+discover :: Resolver IO -> Identifier -> IO (Either Error (Provider,Identifier))
 discover resolve ident = do
   res <- runExceptionT (discoverYADIS resolve ident Nothing)
   case res of
@@ -48,7 +48,7 @@ discover resolve ident = do
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
 --   an OpenID endpoint, and the actual identifier for the user.
-discoverYADIS :: Resolver -> Identifier -> Maybe String
+discoverYADIS :: Resolver IO -> Identifier -> Maybe String
               -> M (Provider,Identifier)
 discoverYADIS resolve ident mb_loc = do
   let err = raise . Error
@@ -102,7 +102,7 @@ parseYADIS ident = handleError . listToMaybe . mapMaybe isOpenId . concat
 
 -- | Attempt to discover an OpenID endpoint, from an HTML document.  The result
 -- will be an endpoint on success, and the actual identifier of the user.
-discoverHTML :: Resolver -> Identifier -> M (Provider,Identifier)
+discoverHTML :: Resolver IO -> Identifier -> M (Provider,Identifier)
 discoverHTML resolve ident = do
   let err = raise . Error
   case parseURI (getIdentifier ident) of

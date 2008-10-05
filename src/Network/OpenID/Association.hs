@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving,
+             MultiParamTypeClasses #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -15,6 +16,10 @@ module Network.OpenID.Association (
     -- * Association
     associate
   , associate'
+
+    -- * Lower-level interface
+  , Assoc, runAssoc, AssocEnv(..)
+  , associate_
 
   , module Network.OpenID.Association.Manager
   , module Network.OpenID.Association.Map
@@ -95,7 +100,7 @@ decodeMacKey st mac pubKey dh = zipWith xor key mac
 --   By default, this tries to use DH-SHA256 and HMAC-SHA256, and falls back to
 --   whatever the server recommends, if the Bool parameter is True.
 associate :: AssociationManager am
-          => am -> Bool -> Resolver -> Provider -> IO (Either Error am)
+          => am -> Bool -> Resolver IO -> Provider -> IO (Either Error am)
 associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
 
 
@@ -103,24 +108,63 @@ associate am rec res prov = associate' am rec res prov HmacSha256 DhSha256
 --   methods.  The Bool specifies whether or not recovery should be attempted
 --   upon a failed request.
 associate' :: AssociationManager am
-           => am -> Bool -> Resolver -> Provider -> AssocType -> SessionType
+           => am -> Bool -> Resolver IO -> Provider -> AssocType -> SessionType
            -> IO (Either Error am)
-associate' am rec res prov at st = runExceptionT
-                                 $ associate_ am rec res prov at st
+associate' am rec res prov at st
+  = runAssoc (AssocEnv getCurrentTime newSessionTypeParams)
+  $ associate_ am rec res prov at st
 
-type M = ExceptionT Error IO
 
-associate_ :: AssociationManager am
-           => am -> Bool -> Resolver -> Provider -> AssocType -> SessionType
-           -> M am
+-- | Association environment
+data AssocEnv m = AssocEnv
+  { currentTime  :: m UTCTime
+  , createParams :: SessionType -> m (Maybe DHParams)
+  }
+
+
+-- | Association monad
+newtype Assoc m a = Assoc (ReaderT (AssocEnv m) (ExceptionT Error m) a)
+  deriving (Functor,Monad)
+
+instance (Monad m, BaseM m m) => BaseM (Assoc m) m where
+  inBase m = Assoc (inBase m)
+
+instance Monad m => ExceptionM (Assoc m) Error where
+  raise e = Assoc (raise e)
+
+instance Monad m => ReaderM (Assoc m) (AssocEnv m) where
+  ask = Assoc ask
+
+
+-- | Running a computation in the association monad
+runAssoc :: (Monad m, BaseM m m)
+         => AssocEnv m -> Assoc m a -> m (Either Error a)
+runAssoc env (Assoc m) = runExceptionT (runReaderT env m)
+
+
+-- | Use the underlying monad to retrieve the current time.
+getTime :: BaseM m m => Assoc m UTCTime
+getTime  = inBase . currentTime =<< ask
+
+
+-- | Generate Diffie-Hellman parameters in the underlying monad.
+newParams :: BaseM m m => SessionType -> Assoc m (Maybe DHParams)
+newParams st = ask >>= \env -> inBase (createParams env st)
+
+
+-- | A "pure" version of association.  It will run in whatever base monad is
+--   provided, layering exception handling over that.
+associate_ :: (BaseM m m, Monad m, AssociationManager am)
+           => am -> Bool -> Resolver m -> Provider -> AssocType -> SessionType
+           -> Assoc m am
 associate_ am' recover resolve prov at st = do
-  now <- inBase getCurrentTime
+  now <- getTime
   let am = expire am' now
   if isJust (findAssociation am prov)
     then return am
     else case validPairing at st of
       True  -> do
-        mb_dh <- inBase (newSessionTypeParams st)
+        mb_dh <- newParams st
         let body = formatParams
                  $ ("openid.ns", openidNS)
                  : ("openid.mode", "associate")
@@ -142,20 +186,20 @@ associate_ am' recover resolve prov at st = do
 
 
 -- | Attempt to recover from an association failure
-recoverAssociation :: AssociationManager am
-                   => am -> Params -> Resolver -> Provider
+recoverAssociation :: (BaseM m m, Monad m, AssociationManager am)
+                   => am -> Params -> Resolver m -> Provider
                    -> AssocType -> SessionType
-                   -> M am
+                   -> Assoc m am
 recoverAssociation am ps res prov at st = associate_ am False res prov
   (l at "assoc_type") (l st "session_type")
   where l d k = fromMaybe d (readMaybe =<< lookup k ps)
 
 
 -- | Handle the response to an associate request.
-handleAssociation :: AssociationManager am
+handleAssociation :: (Monad m, AssociationManager am)
                   => am -> Params -> Maybe DHParams -> Provider -> UTCTime
                   -> AssocType -> SessionType
-                  -> M am
+                  -> Assoc m am
 handleAssociation am ps mb_dh prov now at st = do
   ah <- lookupParam "assoc_handle" ps
   ei <- readParam   "expires_in"   ps
