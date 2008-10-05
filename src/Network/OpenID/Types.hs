@@ -5,7 +5,7 @@
 -- Copyright   : (c) Trevor Elliott, 2008
 -- License     : BSD3
 --
--- Maintainer  : Trevor Elliott <trevor@geekgateway.com>Association.hs
+-- Maintainer  : Trevor Elliott <trevor@geekgateway.com>
 -- Stability   : 
 -- Portability : 
 --
