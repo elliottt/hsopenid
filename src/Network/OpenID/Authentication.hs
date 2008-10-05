@@ -98,9 +98,9 @@ authenticationURI am mode prov ident rt mb_realm =
 
 
 -- | Verify a signature on a set of params.
-verifyAuthentication :: AssociationManager am
-                     => am -> Params -> ReturnTo -> Resolver IO
-                     -> IO (Either Error ())
+verifyAuthentication :: (Monad m, AssociationManager am)
+                     => am -> Params -> ReturnTo -> Resolver m
+                     -> m (Either Error ())
 verifyAuthentication am ps rto resolve =
   runExceptionT $ do
     u <- lookupParam "openid.return_to" ps
@@ -112,12 +112,13 @@ verifyAuthentication am ps rto resolve =
 
 
 -- | Verify an assertion directly
-verifyDirect :: Params -> Provider -> Resolver IO -> ExceptionT Error IO ()
+verifyDirect :: Monad m
+             => Params -> Provider -> Resolver m -> ExceptionT Error m ()
 verifyDirect ps prov resolve = do
   let body = formatParams
            $ ("openid.mode","check_authentication")
            : filter (\p -> fst p /= "openid.mode") ps
-  ersp <- inBase $ resolve Request
+  ersp <- lift $ resolve Request
     { rqURI     = providerURI prov
     , rqMethod  = POST
     , rqHeaders =
@@ -134,7 +135,8 @@ verifyDirect ps prov resolve = do
 
 
 -- | Verify with an association
-verifyWithAssociation :: Params -> Association -> ExceptionT Error IO ()
+verifyWithAssociation :: Monad m
+                      => Params -> Association -> ExceptionT Error m ()
 verifyWithAssociation ps a = do
   mode <- lookupParam "openid.mode" ps
   unless (mode == "id_res") $ raise $ Error $ "unexpected openid.mode: " ++ mode
