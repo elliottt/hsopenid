@@ -29,14 +29,12 @@ import Network.HTTP hiding (Result)
 import Network.URI
 
 
-type M = ExceptionT Error IO
-
-io :: IO a -> M a
-io  = inBase
+type M = ExceptionT Error
 
 
 -- | Attempt to resolve an OpenID endpoint, and user identifier.
-discover :: Resolver IO -> Identifier -> IO (Either Error (Provider,Identifier))
+discover :: Monad m
+         => Resolver m -> Identifier -> m (Either Error (Provider,Identifier))
 discover resolve ident = do
   res <- runExceptionT (discoverYADIS resolve ident Nothing)
   case res of
@@ -48,15 +46,16 @@ discover resolve ident = do
 
 -- | Attempt a YADIS based discovery, given a valid identifier.  The result is
 --   an OpenID endpoint, and the actual identifier for the user.
-discoverYADIS :: Resolver IO -> Identifier -> Maybe String
-              -> M (Provider,Identifier)
+discoverYADIS :: Monad m
+              => Resolver m -> Identifier -> Maybe String
+              -> M m (Provider,Identifier)
 discoverYADIS resolve ident mb_loc = do
   let err = raise . Error
       uri = fromMaybe (getIdentifier ident) mb_loc
   case parseURI uri of
     Nothing  -> err "Unable to parse identifier as a URI"
     Just uri -> do
-      estr <- io $ resolve Request
+      estr <- lift $ resolve Request
         { rqMethod  = GET
         , rqURI     = uri
         , rqHeaders = []
@@ -102,13 +101,14 @@ parseYADIS ident = handleError . listToMaybe . mapMaybe isOpenId . concat
 
 -- | Attempt to discover an OpenID endpoint, from an HTML document.  The result
 -- will be an endpoint on success, and the actual identifier of the user.
-discoverHTML :: Resolver IO -> Identifier -> M (Provider,Identifier)
+discoverHTML :: Monad m
+             => Resolver m -> Identifier -> M m (Provider,Identifier)
 discoverHTML resolve ident = do
   let err = raise . Error
   case parseURI (getIdentifier ident) of
     Nothing  -> err "Unable to parse identifier as a URI"
     Just uri -> do
-      estr <- io $ resolve Request
+      estr <- lift $ resolve Request
         { rqMethod  = GET
         , rqURI     = uri
         , rqHeaders = []
