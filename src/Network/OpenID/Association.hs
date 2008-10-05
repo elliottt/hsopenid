@@ -126,8 +126,8 @@ data AssocEnv m = AssocEnv
 newtype Assoc m a = Assoc (ReaderT (AssocEnv m) (ExceptionT Error m) a)
   deriving (Functor,Monad)
 
-instance (Monad m, BaseM m m) => BaseM (Assoc m) m where
-  inBase m = Assoc (inBase m)
+instance MonadT Assoc where
+  lift = Assoc . lift . lift
 
 instance Monad m => ExceptionM (Assoc m) Error where
   raise e = Assoc (raise e)
@@ -143,18 +143,18 @@ runAssoc env (Assoc m) = runExceptionT (runReaderT env m)
 
 
 -- | Use the underlying monad to retrieve the current time.
-getTime :: BaseM m m => Assoc m UTCTime
-getTime  = inBase . currentTime =<< ask
+getTime :: Monad m => Assoc m UTCTime
+getTime  = lift . currentTime =<< ask
 
 
 -- | Generate Diffie-Hellman parameters in the underlying monad.
-newParams :: BaseM m m => SessionType -> Assoc m (Maybe DHParams)
-newParams st = ask >>= \env -> inBase (createParams env st)
+newParams :: Monad m => SessionType -> Assoc m (Maybe DHParams)
+newParams st = ask >>= \env -> lift (createParams env st)
 
 
 -- | A "pure" version of association.  It will run in whatever base monad is
 --   provided, layering exception handling over that.
-associate_ :: (BaseM m m, Monad m, AssociationManager am)
+associate_ :: (Monad m, AssociationManager am)
            => am -> Bool -> Resolver m -> Provider -> AssocType -> SessionType
            -> Assoc m am
 associate_ am' recover resolve prov at st = do
@@ -171,7 +171,7 @@ associate_ am' recover resolve prov at st = do
                  : ("openid.assoc_type", show at)
                  : ("openid.session_type", show st)
                  : maybe [] dhPairs mb_dh
-        ersp <- inBase $ resolve $ postRequest (providerURI prov) body
+        ersp <- lift $ resolve $ postRequest (providerURI prov) body
         withResponse ersp $ \rsp -> do
           let ps = parseDirectResponse (rspBody rsp)
           case rspCode rsp of
@@ -186,7 +186,7 @@ associate_ am' recover resolve prov at st = do
 
 
 -- | Attempt to recover from an association failure
-recoverAssociation :: (BaseM m m, Monad m, AssociationManager am)
+recoverAssociation :: (Monad m, AssociationManager am)
                    => am -> Params -> Resolver m -> Provider
                    -> AssocType -> SessionType
                    -> Assoc m am
