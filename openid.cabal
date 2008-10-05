@@ -23,14 +23,14 @@ library
   else
     build-depends: base < 3
   build-depends:   HTTP, monadLib, nano-hmac, network, time, xml
+  extra-libraries: crypto, ssl
   hs-source-dirs:  src
-  exposed-modules: Network.OpenID,
-                   Network.SSL,
-                   Codec.Binary.Base64,
+  exposed-modules: Codec.Binary.Base64,
                    Codec.Encryption.DH,
                    Data.Digest.OpenSSL.SHA,
-                   Text.XRDS
-  other-modules:   Network.OpenID.Association,
+                   Network.SSL,
+                   Network.OpenID,
+                   Network.OpenID.Association,
                    Network.OpenID.Association.Manager,
                    Network.OpenID.Association.Map,
                    Network.OpenID.Authentication,
@@ -38,9 +38,12 @@ library
                    Network.OpenID.HTTP,
                    Network.OpenID.Normalization,
                    Network.OpenID.Types,
-                   Network.OpenID.Utils
+                   Network.OpenID.Utils,
+                   Text.XRDS
   ghc-options:     -W
   extensions:      EmptyDataDecls,
                    FlexibleContexts,
-                   ForeignFunctionInterface
-  extra-libraries: crypto, ssl
+                   FlexibleInstances,
+                   ForeignFunctionInterface,
+                   GeneralizedNewtypeDeriving,
+                   MultiParamTypeClasses
