@@ -1,10 +1,11 @@
 name:               openid
-version:            0.1
+version:            0.1.0.1
 cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
 category:           Network
 author:             Trevor Elliott
+homepage:           http://github.com/elliottt/hsopenid
 maintainer:         trevor@geekgateway.com
 copyright:          (c) 2008. Trevor Elliott <trevor@geekgateway.com>
 license:            BSD3
