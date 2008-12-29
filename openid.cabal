@@ -1,6 +1,6 @@
 name:               openid
 version:            0.1
-cabal-version:      >= 1.2
+cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
 category:           Network
@@ -19,10 +19,17 @@ flag split-base
 
 library
   if flag(split-base)
-    build-depends: base >= 3, bytestring, containers
+    build-depends: base       >= 3,
+                   bytestring == 0.9.1.*,
+                   containers == 0.1.0.*
   else
     build-depends: base < 3
-  build-depends:   HTTP, monadLib, nano-hmac, network, time, xml
+  build-depends:   HTTP      == 3001.1.*,
+                   monadLib  == 3.4.5.*,
+                   nano-hmac == 0.2.0.*,
+                   network   == 2.2.0.*,
+                   time      == 1.1.2.*,
+                   xml       == 1.3.1.*
   extra-libraries: crypto, ssl
   hs-source-dirs:  src
   exposed-modules: Codec.Binary.Base64,
