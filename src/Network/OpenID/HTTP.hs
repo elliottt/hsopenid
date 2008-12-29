@@ -36,9 +36,9 @@ import Network.SSL
 import Data.List
 import MonadLib
 import Network.BSD
-import Network.HTTP
+import Network.HTTP hiding (host,port)
 import Network.Socket
-import Network.URI
+import Network.URI hiding (query)
 
 
 -- | Perform an http request.
