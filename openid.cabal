@@ -11,6 +11,7 @@ license:            BSD3
 license-file:       LICENSE
 build-type:         Simple
 tested-with:        GHC == 6.8.2
+extra-source-files: examples/Makefile, examples/test.hs
 
 
 flag split-base
