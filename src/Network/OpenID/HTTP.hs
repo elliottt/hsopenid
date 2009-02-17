@@ -28,9 +28,9 @@ module Network.OpenID.HTTP (
   ) where
 
 -- friends
+import Network.OpenID.SSL
 import Network.OpenID.Types
 import Network.OpenID.Utils
-import Network.SSL
 
 -- libraries
 import Data.List
@@ -67,7 +67,7 @@ makeRequest followRedirect req = case getAuthority (rqURI req) of
 handleRedirect :: Bool -> Request -> Response -> IO (Either ConnError Response)
 handleRedirect False _   rsp = return (Right rsp)
 handleRedirect _     req rsp = case rspCode rsp of
-  (3,0,2) -> case parseURI =<< findHeader HdrLocation rsp of
+  (3,0,_) -> case parseURI =<< findHeader HdrLocation rsp of
     Just uri -> makeRequest False req { rqURI = uri }
     Nothing  -> return (Right rsp)
   _       -> return (Right rsp)
