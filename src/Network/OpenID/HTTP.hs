@@ -15,8 +15,8 @@ module Network.OpenID.HTTP (
     makeRequest
 
     -- * HTTP Utilities
-  , getRequest
-  , postRequest
+  , Network.OpenID.HTTP.getRequest
+  , Network.OpenID.HTTP.postRequest
 
     -- * Request/Response Parsing and Formatting
   , parseDirectResponse
@@ -36,8 +36,12 @@ import Network.OpenID.Utils
 import Data.List
 import MonadLib
 import Network.BSD
-import Network.HTTP hiding (host,port)
+import Network.HTTP (Request(..), Response(..), findHeader, RequestMethod(..),
+    Header(..), HeaderName(..), normalizeRequest, NormalizeRequestOptions(..),
+    defaultNormalizeRequestOptions)
 import Network.Socket
+import Network.HTTP.Stream (ConnError(..), simpleHTTP_)
+import Network.StreamSocket ()  -- Stream instance for Socket in HTTP package
 import Network.URI hiding (query)
 
 
@@ -56,15 +60,17 @@ makeRequest followRedirect req = case getAuthority (rqURI req) of
                 mb_sh <- inBase (sslConnect sock)
                 case mb_sh of
                   Nothing -> return $ Left $ ErrorMisc "sslConnect failed"
-                  Just sh -> simpleHTTP_ sh req
-              else simpleHTTP_ sock req
+                  Just sh -> simpleHTTP_ sh normReq
+              else simpleHTTP_ sock normReq
     case ersp of
       Left  err -> return (Left err)
-      Right rsp -> handleRedirect followRedirect req rsp
+      Right rsp -> handleRedirect followRedirect normReq rsp
+  where
+    normReq = normalizeRequest defaultNormalizeRequestOptions{normDoClose=True} req
 
 
 -- | Follow a redirect
-handleRedirect :: Bool -> Request -> Response -> IO (Either ConnError Response)
+handleRedirect :: Bool -> Request String -> Response String -> IO (Either ConnError (Response String))
 handleRedirect False _   rsp = return (Right rsp)
 handleRedirect _     req rsp = case rspCode rsp of
   (3,0,_) -> case parseURI =<< findHeader HdrLocation rsp of
@@ -92,7 +98,7 @@ getAuthority uri = case uriAuthority uri of
 -- Utilities -------------------------------------------------------------------
 
 
-getRequest :: URI -> Request
+getRequest :: URI -> Request String
 getRequest uri = Request
   { rqURI     = uri
   , rqMethod  = GET
@@ -101,7 +107,7 @@ getRequest uri = Request
   }
 
 
-postRequest :: URI -> String -> Request
+postRequest :: URI -> String -> Request String
 postRequest uri body = Request
   { rqURI     = uri
   , rqMethod  = POST

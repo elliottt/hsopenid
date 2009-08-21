@@ -25,7 +25,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import MonadLib
-import Network.HTTP hiding (Result)
+import Network.HTTP
 import Network.URI
 
 
@@ -70,7 +70,7 @@ discoverYADIS resolve ident mb_loc = do
               let e = err "Unable to parse YADIS document"
               doc <- maybe e return $ parseXRDS $ rspBody rsp
               parseYADIS ident doc
-          _       -> err "HTTP request error: unexpected response code"
+          _       -> err $ "HTTP request error: unexpected response code "++show (rspCode rsp)
 
 
 -- | Parse out an OpenID endpoint, and actual identifier from a YADIS xml
@@ -119,7 +119,7 @@ discoverHTML resolve ident = do
         Right rsp -> case rspCode rsp of
           (2,0,0) -> maybe (err "Unable to find identifier in HTML") return
                        $ parseHTML ident $ rspBody rsp
-          _       -> err "HTTP request error: unexpected response code"
+          _       -> err $ "HTTP request error: unexpected response code "++show (rspCode rsp)
 
 
 -- | Parse out an OpenID endpoint and an actual identifier from an HTML

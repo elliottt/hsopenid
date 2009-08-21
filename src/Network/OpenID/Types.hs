@@ -34,6 +34,7 @@ import Data.Word
 import Network.URI
 
 import Network.HTTP
+import Network.Stream
 
 --------------------------------------------------------------------------------
 -- Types
@@ -86,7 +87,7 @@ type ReturnTo = String
 type Realm = String
 
 -- | A way to resolve an HTTP request
-type Resolver m = Request -> m (Either ConnError Response)
+type Resolver m = Request String -> m (Either ConnError (Response String))
 
 -- | An OpenID provider.
 newtype Provider = Provider { providerURI :: URI } deriving (Eq,Show)

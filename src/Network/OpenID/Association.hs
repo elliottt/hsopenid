@@ -42,7 +42,7 @@ import Data.Maybe
 import Data.Time
 import Data.Word
 import MonadLib
-import Network.HTTP hiding (Result)
+import Network.HTTP
 
 -- Utilities -------------------------------------------------------------------
 
@@ -171,7 +171,7 @@ associate_ am' recover resolve prov at st = do
                  : ("openid.assoc_type", show at)
                  : ("openid.session_type", show st)
                  : maybe [] dhPairs mb_dh
-        ersp <- lift $ resolve $ postRequest (providerURI prov) body
+        ersp <- lift $ resolve $ Network.OpenID.HTTP.postRequest (providerURI prov) body
         withResponse ersp $ \rsp -> do
           let ps = parseDirectResponse (rspBody rsp)
           case rspCode rsp of

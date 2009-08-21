@@ -42,6 +42,7 @@ import Data.Maybe
 import Data.Word
 import MonadLib
 import Network.HTTP
+import Network.Stream
 
 
 -- General Helpers -------------------------------------------------------------
@@ -124,6 +125,6 @@ readParam k ps = readM err =<< lookupParam k ps
 
 -- | Make an HTTP request, and run a function with a successful response
 withResponse :: ExceptionM m Error
-             => Either ConnError Response -> (Response -> m a) -> m a
+             => Either ConnError (Response String) -> (Response String -> m a) -> m a
 withResponse (Left  err) _ = raise $ Error $ show err
 withResponse (Right rsp) f = f rsp
