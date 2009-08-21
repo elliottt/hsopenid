@@ -21,7 +21,7 @@ flag split-base
 
 library
   if flag(split-base)
-    build-depends: base       >= 3,
+    build-depends: base       >= 3 && < 10,
                    bytestring == 0.9.1.*,
                    containers == 0.2.*
   else
