@@ -1,5 +1,5 @@
 name:               openid
-version:            0.1.1.0
+version:            0.1.2.0
 cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
