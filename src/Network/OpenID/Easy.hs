@@ -10,7 +10,7 @@
 -- Portability : 
 --
 
-module OpenID.Easy (
+module Network.OpenID.Easy (
     Config(..),
     Session(..),
     auth, verify, config
