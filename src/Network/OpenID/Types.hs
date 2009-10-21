@@ -74,7 +74,7 @@ data Association = Association
   , assocHandle    :: String
   , assocMacKey    :: [Word8]
   , assocType      :: AssocType
-  } deriving Show
+  } deriving (Show,Read)
 
 
 -- | Parameter lists for communication with the server

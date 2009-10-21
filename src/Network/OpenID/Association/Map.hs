@@ -27,7 +27,7 @@ import qualified Data.Map as Map
 
 -- | A simple association manager based on Data.Map
 newtype AssociationMap = AM (Map.Map String (UTCTime,Association))
-  deriving Show
+    deriving (Show,Read)
 
 instance AssociationManager AssociationMap where
   findAssociation (AM m) p = snd `fmap` Map.lookup (showProvider p) m
