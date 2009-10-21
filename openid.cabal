@@ -1,5 +1,5 @@
 name:               openid
-version:            0.1.4.0
+version:            0.1.4.1
 cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
@@ -12,7 +12,7 @@ license:            BSD3
 license-file:       LICENSE
 build-type:         Simple
 tested-with:        GHC == 6.8.2
-extra-source-files: examples/Makefile, examples/test.hs
+extra-source-files: examples/Makefile, examples/test.hs examples/easy.hs
 
 
 flag split-base
@@ -47,6 +47,7 @@ library
                    Network.OpenID.Normalization,
                    Network.OpenID.Types,
                    Network.OpenID.Utils,
+                   Network.OpenID.Easy,
                    Text.XRDS
   other-modules:   Network.OpenID.SSL
   ghc-options:     -W
