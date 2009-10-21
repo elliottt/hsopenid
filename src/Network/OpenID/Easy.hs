@@ -76,8 +76,8 @@ auth config ident returnTo = withSocketsDo $ do
                             return $ Session {
                                 sAuthURI = show $ authenticationURI
                                     am Setup provider identifier returnTo Nothing,
-                                sProvider = show provider,
-                                sIdentity = show identifier,
+                                sProvider = show $ providerURI provider,
+                                sIdentity = getIdentifier identifier,
                                 sReturnTo = returnTo,
                                 sAssocMap = am
                             }
