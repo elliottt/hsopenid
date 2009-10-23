@@ -25,6 +25,7 @@ module Network.OpenID.Types (
   , modifyProvider
   , Identifier(..)
   , Error(..)
+  , assocString
   ) where
 
 -- Libraries
@@ -41,16 +42,22 @@ import Network.Stream
 
 -- | Supported association types
 data AssocType = HmacSha1 | HmacSha256
+    deriving (Read,Show)
 
+assocString :: AssocType -> String
+assocString HmacSha1 = "HMAC-SHA1"
+assocString HmacSha256 = "HMAC-SHA256"
+
+{-
 instance Show AssocType where
-  show HmacSha1   = "HMAC-SHA1"
-  show HmacSha256 = "HMAC-SHA256"
+    show HmacSha1 = "HMAC-SHA1"
+    show HmacSha256 = "HMAC-SHA256"
 
 instance Read AssocType where
   readsPrec _ str | "HMAC-SHA1"   `isPrefixOf` str = [(HmacSha1  ,drop  9  str)]
                   | "HMAC-SHA256" `isPrefixOf` str = [(HmacSha256, drop 11 str)]
                   | otherwise                      = []
-
+-}
 
 -- | Session types for association establishment
 data SessionType = NoEncryption | DhSha1 | DhSha256

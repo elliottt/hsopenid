@@ -168,7 +168,7 @@ associate_ am' recover resolve prov at st = do
         let body = formatParams
                  $ ("openid.ns", openidNS)
                  : ("openid.mode", "associate")
-                 : ("openid.assoc_type", show at)
+                 : ("openid.assoc_type", assocString at)
                  : ("openid.session_type", show st)
                  : maybe [] dhPairs mb_dh
         ersp <- lift $ resolve $ Network.OpenID.HTTP.postRequest (providerURI prov) body
