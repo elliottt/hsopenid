@@ -12,7 +12,7 @@
 
 module Network.OpenID.Association.Map (
     -- Association Map
-    AssociationMap
+    AssociationMap(..)
   , emptyAssociationMap
   ) where
 

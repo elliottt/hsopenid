@@ -13,7 +13,7 @@
 module Network.OpenID.Easy (
     Config(..),
     Session(..),
-    auth, verify, config
+    auth, verify, config, readSession
 ) where
 
 import Network.OpenID
@@ -52,6 +52,9 @@ data Session = Session {
     -- | the association map manager thing used internally
     sAssocMap :: AssociationMap
 } deriving (Read,Show)
+
+readSession :: String -> Session
+readSession = read
 
 -- | Given a configuration, identity, and return uri,
 --   contact the remote provider to create a Session object encapsulating the
