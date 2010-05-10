@@ -1,4 +1,3 @@
-{-# INCLUDE <openssl/evp.h> #-}
 {-# LANGUAGE ForeignFunctionInterface, EmptyDataDecls #-}
 
 --------------------------------------------------------------------------------

@@ -37,7 +37,6 @@ import Network.OpenID.Utils
 
 -- Libraries
 import Data.Bits
-import Data.List
 import Data.Maybe
 import Data.Time
 import Data.Word

@@ -29,7 +29,6 @@ module Network.OpenID.Types (
   ) where
 
 -- Libraries
-import Control.Monad
 import Data.List
 import Data.Word
 import Network.URI

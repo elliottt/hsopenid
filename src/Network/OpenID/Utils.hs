@@ -36,9 +36,7 @@ import Network.OpenID.Types
 
 -- libraries
 import Data.Bits
-import Data.Char
 import Data.List
-import Data.Maybe
 import Data.Word
 import MonadLib
 import Network.HTTP
