@@ -1,5 +1,5 @@
 name:               openid
-version:            0.1.4.5
+version:            0.1.4.6
 cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
@@ -27,7 +27,7 @@ library
   else
     build-depends: base < 3
   build-depends:   HTTP      >= 4000.0.5 && < 4000.1,
-                   monadLib  == 3.5.*,
+                   monadLib  == 3.6.*,
                    nano-hmac == 0.2.*,
                    network   == 2.2.*,
                    time      == 1.1.*,
