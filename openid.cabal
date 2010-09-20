@@ -1,5 +1,5 @@
 name:               openid
-version:            0.1.4.6
+version:            0.1.5.0
 cabal-version:      >= 1.6
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
@@ -47,7 +47,6 @@ library
                    Network.OpenID.Normalization,
                    Network.OpenID.Types,
                    Network.OpenID.Utils,
-                   Network.OpenID.Easy,
                    Text.XRDS
   other-modules:   Network.OpenID.SSL
   ghc-options:     -W
