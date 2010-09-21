@@ -1,13 +1,11 @@
 
 import MonadLib
 import Network.OpenID
-import Network.SSL
 
 import Network.Socket
 import System.Environment
 
 main = withSocketsDo $ do
-  sslInit
   [ident,check] <- getArgs
   case normalizeIdentifier (Identifier ident) of
     Nothing -> putStrLn "Unable to normalize identifier"
