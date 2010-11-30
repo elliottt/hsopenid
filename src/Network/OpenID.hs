@@ -12,6 +12,7 @@
 
 module Network.OpenID (
     module Network.OpenID.Association
+  , module Network.OpenID.AttributeExchange
   , module Network.OpenID.Authentication
   , module Network.OpenID.Discovery
   , module Network.OpenID.HTTP
@@ -22,6 +23,7 @@ module Network.OpenID (
 
 -- Friends
 import Network.OpenID.Association
+import Network.OpenID.AttributeExchange
 import Network.OpenID.Authentication
 import Network.OpenID.Discovery
 import Network.OpenID.HTTP

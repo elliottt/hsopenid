@@ -78,11 +78,44 @@ getSignedFields ks ps = maybe err return (mapM lkp ks)
 --------------------------------------------------------------------------------
 -- Authentication
 
--- | Generate an authentication URL
-authenticationURI :: AssociationManager am
-                  => am -> CheckIdMode -> Provider -> Identifier -> ReturnTo
-                  -> Maybe Realm -> URI
-authenticationURI am mode prov ident rt mb_realm =
+-- | Generate an authentication URL. The params field allows you to
+-- | specify any extensions, for example, AttributeExchange.
+authenticationURI :: AssociationManager am =>
+
+                     am           -- ^ Your pre-established assocations
+
+                  -> CheckIdMode  -- ^ Use this if you want to try to
+                                  -- use OpenID's Immediate mode. Some
+                                  -- providers won't ever let this
+                                  -- mode succeed, whereas some won't
+                                  -- even prompt the user in Setup
+                                  -- mode and go straight for the
+                                  -- redirect. It is safe to use the
+                                  -- Setup mode only.
+
+                  -> Provider     -- ^ The OpenID provider's (e.g
+                                  -- Google or Yahoo) OpenID URI
+
+                  -> Identifier   -- ^ The identity URI you are trying
+                                  -- to verify. Please note that a
+                                  -- number of providers no longer
+                                  -- encode their services' usernames
+                                  -- into the URI.
+
+                  -> ReturnTo     -- ^ After the user verifies that
+                                  -- they are indeed "them" with the
+                                  -- OpenID provider, where should
+                                  -- said provider redirect them?
+
+                  -> Maybe Params -- ^ Additional params for OpenID
+                                  -- extensions. You can use this to
+                                  -- verify a user's email using
+                                  -- Attribute Extensions.
+
+                  -> Maybe Realm
+
+                  -> URI
+authenticationURI am mode prov ident rt mb_exts mb_realm =
   addParams params (providerURI prov)
   where
     params = [ ("openid.ns", openidNS)
@@ -91,6 +124,7 @@ authenticationURI am mode prov ident rt mb_realm =
              , ("openid.identity", getIdentifier ident)
              , ("openid.return_to", rt)
              ] ++ ah ++
+             maybe [] id mb_exts ++
              maybe [] (\r -> [("openid.realm", r)]) mb_realm
     ah = case findAssociation am prov of
       Nothing -> []
