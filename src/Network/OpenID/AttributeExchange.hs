@@ -2,7 +2,7 @@ module Network.OpenID.AttributeExchange (
     AXFieldTy(..),
     AXFieldVal,
     axName, axSpec, axTyFromName,
-    
+
     axEmailRequired,
     axExtParams,
     axExtParams',
@@ -10,6 +10,7 @@ module Network.OpenID.AttributeExchange (
 ) where
 
 import Control.Applicative
+import Control.Monad (guard)
 import Network.OpenID.Types
 
 import Data.Maybe (listToMaybe, mapMaybe, fromMaybe)
@@ -18,6 +19,7 @@ import Data.List (intercalate, nub, isPrefixOf)
 defaultAlias :: String
 defaultAlias = "ax"
 
+extNamespace, extNamespacePrefix, extMode_fetchRequest :: String
 extNamespace  = "http://openid.net/srv/ax/1.0"
 extNamespacePrefix = "http://openid.net/srv/ax/1." 
 extMode_fetchRequest = "fetch_request"
@@ -131,13 +133,10 @@ getAxFields' ps alias =
     mapMaybe getAxFieldTypes' ps
     where
       getAxFieldTypes' :: (String, String) -> Maybe AXFieldVal
-      getAxFieldTypes' (n,v) =
-          case valueAliasPrefix `isPrefixOf` n of
-            False -> Nothing
-            True  ->
-                fmap (flip (,) v) fieldTyMb
-                where
-                  fieldTyMb = axTyFromName $ drop (length valueAliasPrefix) n
+      getAxFieldTypes' (n,v) = do
+        guard (valueAliasPrefix `isPrefixOf` n)
+        ty <- axTyFromName $ drop (length valueAliasPrefix) n
+        return (ty,v)
 
       valueAliasPrefix = "openid." ++ alias ++ ".value."
 
@@ -154,9 +153,6 @@ getAxFields' ps alias =
 -- and type.email. the other libraries I've seen assume this as well
 -- so we'll just go with that.
 getAxAlias :: (String, String) -> Maybe String
-getAxAlias (n,v) =
-    case "openid.ns." `isPrefixOf` n
-      && extNamespacePrefix `isPrefixOf` v of
-      False -> Nothing
-      True ->  Just $ drop (length "openid.ns.") n
-      
+getAxAlias (n,v) = do
+  guard ("openid.ns." `isPrefixOf` n && extNamespacePrefix `isPrefixOf` v)
+  return (drop (length "openid.ns.") n)
