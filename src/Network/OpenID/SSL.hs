@@ -29,14 +29,16 @@ data SSLHandle = SSLHandle SSLContext SSL
 
 wrap m = Right `fmap` m `Prelude.catch` handler
   where
-    handler = (return . Left . ErrorMisc . ((++) "write: ") . show)
+    handler err = return $ Left $ ErrorMisc $ "write: " ++ show err
 
 wrapRead m = Right `fmap` m `catches` handlers
   where
     handlers :: [Handler (Either ConnError String)]
     handlers =
-        [ Handler ((\_ -> (return . Right) "") :: (ConnectionAbruptlyTerminated -> IO (Either ConnError String)))
-        , Handler ((\x -> (return . Left. ErrorMisc . ((++) "read: ") . show) x) :: (SomeException -> IO (Either ConnError String)))
+        [ Handler ((\_ -> return $ Right "")
+          :: (ConnectionAbruptlyTerminated -> IO (Either ConnError String)))
+        , Handler ((\x -> return $ Left $ ErrorMisc  $ "read: " ++ show x)
+          :: (SomeException -> IO (Either ConnError String)))
         ]
 
 -- The problem is that the OpenSSL library doesn't know that in some
@@ -56,28 +58,33 @@ instance Stream SSLHandle where
   readLine sh =
     wrapRead (upd `fmap` sslReadWhile (/= c) sh)
     where
-      c = toEnum (fromEnum '\n')
+      c      = toEnum (fromEnum '\n')
       upd bs = map (toEnum . fromEnum) bs ++ "\n"
 
-  readBlock  (SSLHandle _ ssl) n  = wrapRead $ (map w2c . B.unpack) <$> Session.read ssl n
+  readBlock (SSLHandle _ ssl) n =
+    wrapRead ((map w2c . B.unpack) <$> Session.read ssl n)
 
   writeBlock (SSLHandle _ ssl) bs =
-    case (not $ null bs) of
-      True -> (wrap $ Session.write ssl $ B.pack $ map c2w $ bs)
-      False -> return $ Right ()
+    | not (null bs) = wrap   $ Session.write ssl $ B.pack $ map c2w $ bs
+    | otherwise     = return $ Right ()
 
-  close (SSLHandle _ ssl) = Session.shutdown ssl Bidirectional `E.catch` ((\_ -> return ()) :: SomeException -> IO ())
+  -- should this really ignore all exceptions?
+  close (SSLHandle _ ssl) = Session.shutdown ssl Bidirectional
+    `E.catch` ((\_ -> return ()) :: SomeException -> IO ())
+
   closeOnEnd _ _ = return ()
 
 sslConnect :: Socket -> IO (Maybe SSLHandle)
-sslConnect sock = do
-  E.catch (do
-      ctx <- Session.context
-      ssl <- Session.connection ctx sock
-      Session.connect ssl
-      return $ Just $ SSLHandle ctx ssl
-    )
-    ((\_ -> return Nothing) :: SomeException -> IO (Maybe SSLHandle))
+sslConnect sock = body `E.catch` handler
+  where
+  body = do
+    ctx <- Session.context
+    ssl <- Session.connection ctx sock
+    Session.connect ssl
+    return $ Just $ SSLHandle ctx ssl
+
+  handler :: SomeException -> IO (Maybe SSLHandle)
+  handler _ = return Nothing
 
 sslReadWhile :: (Word8 -> Bool) -> SSLHandle -> IO [Word8]
 sslReadWhile pred (SSLHandle _ ssl) = rw
