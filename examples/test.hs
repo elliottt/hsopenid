@@ -1,11 +1,12 @@
 
-import MonadLib
 import Network.OpenID
 
+import MonadLib
 import Network.Socket
 import System.Environment
+import OpenSSL
 
-main = withSocketsDo $ do
+main = withSocketsDo $ withOpenSSL $ do
   [ident,check] <- getArgs
   case normalizeIdentifier (Identifier ident) of
     Nothing -> putStrLn "Unable to normalize identifier"
@@ -21,7 +22,7 @@ main = withSocketsDo $ do
           case eam of
             Left err -> putStrLn $ "associate: " ++ show err
             Right am -> do
-              let au = authenticationURI am Setup p i check Nothing
+              let au = authenticationURI am Setup p i check Nothing Nothing
               print au
               line <- getLine
               let params = parseParams line

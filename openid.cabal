@@ -1,6 +1,6 @@
 name:               openid
 version:            0.2.0.0
-cabal-version:      >= 1.6
+cabal-version:      >= 1.8
 synopsis:           An implementation of the OpenID-2.0 spec.
 description:        An implementation of the OpenID-2.0 spec.
 category:           Network
@@ -14,6 +14,9 @@ build-type:         Simple
 tested-with:        GHC == 6.12.1
 extra-source-files: examples/Makefile, examples/test.hs examples/easy.hs
 
+flag examples
+  default:     False
+  description: Build an example program
 
 flag split-base
   default:     True
@@ -57,3 +60,13 @@ library
                    ForeignFunctionInterface,
                    GeneralizedNewtypeDeriving,
                    MultiParamTypeClasses
+
+executable openid-test
+  main-is:         examples/test.hs
+
+  if flag(examples)
+    buildable:     True
+    build-depends: base, openid, monadLib, network, HsOpenSSL
+
+  else
+    buildable:     False
