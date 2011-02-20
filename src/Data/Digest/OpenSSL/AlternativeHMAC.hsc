@@ -2,7 +2,9 @@
 
 module Data.Digest.OpenSSL.AlternativeHMAC
     ( hmac
+    , unsafeHMAC
     , showHMAC
+    , CryptoHashFunction()
     , sha
     , sha1
     , sha224
@@ -23,29 +25,31 @@ import OpenSSL.EVP.Digest
 
 -- Types -----------------------------------------------------------------------
 
+newtype CryptoHashFunction = CryptoHashFunction String
+
 -- | Name of the SHA digest, used by getDigestByName
-sha :: String
-sha = #const_str SN_sha
+sha :: CryptoHashFunction
+sha = CryptoHashFunction (#const_str SN_sha)
 
 -- | Name of the SHA1 digest, used by getDigestByName
-sha1 :: String
-sha1 = #const_str SN_sha1
+sha1 :: CryptoHashFunction
+sha1 = CryptoHashFunction (#const_str SN_sha1)
 
 -- | Name of the SHA224 digest, used by getDigestByName
-sha224 :: String
-sha224 = #const_str SN_sha224
+sha224 :: CryptoHashFunction
+sha224 = CryptoHashFunction (#const_str SN_sha224)
 
 -- | Name of the SHA256 digest, used by getDigestByName
-sha256 :: String
-sha256 = #const_str SN_sha256
+sha256 :: CryptoHashFunction
+sha256 = CryptoHashFunction (#const_str SN_sha256)
 
 -- | Name of the SHA384 digest, used by getDigestByName
-sha384 :: String
-sha384 = #const_str SN_sha384
+sha384 :: CryptoHashFunction
+sha384 = CryptoHashFunction (#const_str SN_sha384)
 
 -- | Name of the SHA384 digest, used by getDigestByName
-sha512 :: String
-sha512 = #const_str SN_sha512
+sha512 :: CryptoHashFunction
+sha512 = CryptoHashFunction (#const_str SN_sha512)
 
 
 
@@ -61,14 +65,18 @@ showHMAC bs =
                  x   -> x
 
 -- | Wrapper/rendering function for hmac
-hmac :: String      -- ^ the name of the digest
-     -> ByteString  -- ^ the HMAC key
-     -> ByteString  -- ^ the data to be signed
-     -> String      -- ^ the hex-representation of the resulting HMAC
-hmac s k i = 
-  unsafePerformIO $
-  getDigestByName s >>= \mbDigest ->
-  case mbDigest of
-    Nothing -> fail "no digest"
-    Just d ->
-        return $ showHMAC $ hmacBS d k i
+unsafeHMAC :: CryptoHashFunction -- ^ the name of the digest
+     -> ByteString         -- ^ the HMAC key
+     -> ByteString         -- ^ the data to be signed
+     -> String             -- ^ the hex-representation of the resulting HMAC
+unsafeHMAC h k i = unsafePerformIO (hmac h k i)
+
+hmac :: CryptoHashFunction
+     -> ByteString
+     -> ByteString
+     -> IO String
+hmac (CryptoHashFunction s) k i =
+  getDigestByName s >>= \ mbDigest ->
+    case mbDigest of
+      Nothing -> fail "no digest"
+      Just d  -> return $ showHMAC $ hmacBS d k i

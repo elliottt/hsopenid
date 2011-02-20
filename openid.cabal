@@ -28,7 +28,6 @@ library
     build-depends: base < 3
   build-depends:   HTTP      >= 4000.0.9 && < 4000.2,
                    monadLib  == 3.6.*,
-                   nano-hmac == 0.2.*,
                    network   == 2.2.*,
                    time      == 1.1.*,
                    xml       == 1.3.*,
@@ -36,6 +35,7 @@ library
   hs-source-dirs:  src
   exposed-modules: Codec.Binary.Base64,
                    Codec.Encryption.DH,
+                   Data.Digest.OpenSSL.AlternativeHMAC,
                    Data.Digest.OpenSSL.SHA,
                    Network.OpenID,
                    Network.OpenID.Association,
@@ -46,10 +46,10 @@ library
                    Network.OpenID.Discovery,
                    Network.OpenID.HTTP,
                    Network.OpenID.Normalization,
+                   Network.OpenID.SSL
                    Network.OpenID.Types,
                    Network.OpenID.Utils,
                    Text.XRDS
-  other-modules:   Network.OpenID.SSL
   ghc-options:     -W
   extensions:      EmptyDataDecls,
                    FlexibleContexts,

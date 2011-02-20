@@ -26,6 +26,7 @@ import Network.OpenID.Association.Manager
 import Network.OpenID.HTTP
 import Network.OpenID.Types
 import Network.OpenID.Utils
+import qualified Data.Digest.OpenSSL.AlternativeHMAC as HMAC
 
 -- libraries
 import Data.List
@@ -33,9 +34,7 @@ import MonadLib
 import Network.HTTP
 import Network.URI
 import Numeric
-
 import qualified Data.ByteString as BS
-import qualified Data.Digest.OpenSSL.HMAC as HMAC
 
 
 --------------------------------------------------------------------------------
