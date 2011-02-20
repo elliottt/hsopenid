@@ -64,7 +64,7 @@ instance Stream SSLHandle where
   readBlock (SSLHandle _ ssl) n =
     wrapRead ((map w2c . B.unpack) <$> Session.read ssl n)
 
-  writeBlock (SSLHandle _ ssl) bs =
+  writeBlock (SSLHandle _ ssl) bs
     | not (null bs) = wrap   $ Session.write ssl $ B.pack $ map c2w $ bs
     | otherwise     = return $ Right ()
 
