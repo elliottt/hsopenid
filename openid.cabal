@@ -22,6 +22,10 @@ flag split-base
   default:     True
   description: Use the new split base package.
 
+source-repository head
+  type:            git
+  location:        git://github.com/elliottt/hsopenid.git
+
 library
   if flag(split-base)
     build-depends: base       >= 3 && < 10,
