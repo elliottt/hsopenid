@@ -12,7 +12,6 @@ license:            BSD3
 license-file:       LICENSE
 build-type:         Simple
 tested-with:        GHC == 6.12.1
-extra-source-files: examples/Makefile, examples/test.hs examples/easy.hs
 
 flag examples
   default:     False
