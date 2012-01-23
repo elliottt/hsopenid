@@ -57,7 +57,7 @@ makeRequest followRedirect req = case getAuthority (rqURI req) of
     connect sock $ SockAddrInet port $ head $ hostAddresses hi
     ersp <- if uriScheme (rqURI req) == "https:"
               then inBase $ do
-                mb_sh <- inBase (sslConnect sock)
+                mb_sh <- sslConnect sock
                 case mb_sh of
                   Nothing -> return $ Left $ ErrorMisc "sslConnect failed"
                   Just sh -> simpleHTTP_ sh normReq
