@@ -63,6 +63,7 @@ library
 
 executable openid-test
   main-is:         examples/test.hs
+  ghc-options:     -threaded
 
   if flag(examples)
     buildable:     True
