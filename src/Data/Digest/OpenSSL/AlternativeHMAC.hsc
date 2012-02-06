@@ -59,7 +59,7 @@ showHMAC :: ByteString -- ^ the HMAC
 showHMAC bs =
     concatMap draw $ BS.unpack bs
     where
-      draw :: (Integral a) => a -> String
+      draw :: (Integral a, Show a) => a -> String
       draw w = case showHex w [] of
                  [x] -> ['0', x]
                  x   -> x

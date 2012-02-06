@@ -12,9 +12,16 @@ module Codec.Encryption.DH (
   , computeKey
   ) where
 
+import Data.Bits (shiftL,shiftR,(.|.),testBit)
 import Data.List
-import Foreign
-import Foreign.C
+import Data.Word (Word8)
+import Foreign.C (CInt,CUChar)
+import Foreign.Marshal.Alloc (alloca)
+import Foreign.Marshal.Array
+    (peekArray,withArray,allocaArray,withArrayLen,mallocArray)
+import Foreign.Ptr (Ptr,nullPtr)
+import Foreign.Storable (Storable(..))
+import System.IO.Unsafe (unsafePerformIO)
 
 #include <openssl/bn.h>
 #include <openssl/dh.h>
