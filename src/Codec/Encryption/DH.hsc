@@ -15,10 +15,10 @@ module Codec.Encryption.DH (
 import Data.Bits (shiftL,shiftR,(.|.),testBit)
 import Data.List
 import Data.Word (Word8)
-import Foreign.C (CInt,CUChar)
+import Foreign.C (CInt(..),CUChar(..))
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Marshal.Array
-    (peekArray,withArray,allocaArray,withArrayLen,mallocArray)
+    (peekArray,allocaArray,withArrayLen,mallocArray)
 import Foreign.Ptr (Ptr,nullPtr)
 import Foreign.Storable (Storable(..))
 import System.IO.Unsafe (unsafePerformIO)
