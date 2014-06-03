@@ -16,6 +16,7 @@ module Data.Digest.OpenSSL.SHA (sha1, sha256) where
 import Control.Exception
 import Foreign
 import Foreign.C
+import System.IO.Unsafe (unsafePerformIO)
 
 data EVP_MD
 data EVP_MD_CTX
