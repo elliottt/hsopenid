@@ -39,11 +39,11 @@ hashWith hf bs =
   bracket c_EVP_MD_CTX_create c_EVP_MD_CTX_destroy $ \ evp_md_ctx ->
   withArrayLen (map (toEnum . fromEnum) bs) $ \ len arr -> do
     h <- hf
-    c_EVP_DigestInit_ex  evp_md_ctx h nullPtr
-    c_EVP_DigestUpdate   evp_md_ctx arr (toEnum len)
+    _ <- c_EVP_DigestInit_ex  evp_md_ctx h nullPtr
+    _ <- c_EVP_DigestUpdate   evp_md_ctx arr (toEnum len)
     allocaArray 64 $ \ hash ->
       alloca $ \ num  -> do
-        c_EVP_DigestFinal_ex evp_md_ctx hash num
+        _ <- c_EVP_DigestFinal_ex evp_md_ctx hash num
         n <- peek num
         hs <- peekArray (fromEnum n) hash
         return $ map (toEnum . fromEnum) hs

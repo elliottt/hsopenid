@@ -15,12 +15,13 @@ module Network.OpenID.SSL (
         sslConnect
     ) where
 
+import Prelude()
+import Prelude.Compat
 import OpenSSL.Session as Session
 import qualified Control.Exception as E
 import Network.Socket
 import Network.Stream
 import qualified Data.ByteString as B
-import Control.Applicative
 import Data.ByteString.Internal (w2c, c2w)
 import Data.Word
 

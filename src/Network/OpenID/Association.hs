@@ -36,6 +36,8 @@ import Network.OpenID.Types
 import Network.OpenID.Utils
 
 -- Libraries
+import Prelude()
+import Prelude.Compat
 import Data.Bits
 import Data.Maybe
 import Data.Time
@@ -123,7 +125,7 @@ data AssocEnv m = AssocEnv
 
 -- | Association monad
 newtype Assoc m a = Assoc (ReaderT (AssocEnv m) (ExceptionT Error m) a)
-  deriving (Functor,Monad)
+  deriving (Functor,Applicative,Monad)
 
 instance MonadT Assoc where
   lift = Assoc . lift . lift

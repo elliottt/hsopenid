@@ -54,10 +54,10 @@ discoverYADIS resolve ident mb_loc = do
       uri = fromMaybe (getIdentifier ident) mb_loc
   case parseURI uri of
     Nothing  -> err "Unable to parse identifier as a URI"
-    Just uri -> do
+    Just u   -> do
       estr <- lift $ resolve Request
         { rqMethod  = GET
-        , rqURI     = uri
+        , rqURI     = u
         , rqHeaders = []
         , rqBody    = ""
         }

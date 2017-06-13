@@ -32,8 +32,8 @@ newtype AssociationMap = AM (Map.Map String (UTCTime,Association))
 instance AssociationManager AssociationMap where
   findAssociation (AM m) p = snd `fmap` Map.lookup (showProvider p) m
 
-  addAssociation (AM m) now p a = AM (Map.insert (showProvider p) (expire,a) m)
-    where expire = addUTCTime (toEnum (assocExpiresIn a)) now
+  addAssociation (AM m) now p a = AM (Map.insert (showProvider p) (ex,a) m)
+    where ex = addUTCTime (toEnum (assocExpiresIn a)) now
 
   expire (AM m) now = AM (Map.filter ((now >) . fst) m)
 

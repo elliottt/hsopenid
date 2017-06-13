@@ -9,7 +9,8 @@ module Network.OpenID.AttributeExchange (
     getAxFields
 ) where
 
-import Control.Applicative
+import Prelude()
+import Prelude.Compat
 import Control.Monad (guard)
 import Network.OpenID.Types
 
